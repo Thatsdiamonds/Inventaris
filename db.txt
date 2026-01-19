@@ -1,0 +1,50 @@
+#users
+id
+username (unique)
+password
+role (admin, editor)
+name
+
+#settings
+id
+nama_gereja
+alamat (nullable)
+logo_path (nullable)
+
+#categories
+id
+name (unique)
+description
+
+#locations
+id
+name
+description
+
+#items
+id
+uqcode (unique)
+name
+category_id
+location_id
+condition (enum: baik, rusak, perbaikan, dimusnahkan)
+photo_path (nullable)
+service_interval_days (integer, contoh: 1, 7, 30, 60 — HARUS days)
+service_required (boolean)
+last_service_date (date, nullable)
+is_active (boolean)
+
+#services
+id
+item_id
+vendor
+date_in
+date_out (nullable)
+description
+cost (nullable)
+
+#disposal
+id
+item_id (unique)
+date
+reason
