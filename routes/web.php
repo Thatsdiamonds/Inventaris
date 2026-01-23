@@ -6,6 +6,32 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ServiceController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportLayoutController;
+use App\Http\Controllers\ServiceReportController;
+Route::middleware(['auth'])->group(function () {
+
+    Route::get('/reports', [ReportController::class, 'menu'])
+        ->name('reports.menu');
+
+    // ===== LAPORAN INVENTARIS =====
+Route::get('/reports/inventory', [ReportController::class, 'index'])
+    ->name('reports.inventory');
+
+Route::post('/reports/inventory', [ReportController::class, 'generate'])
+    ->name('reports.inventory.generate');
+    
+Route::post('/reports/services', [ServiceReportController::class, 'generate'])
+    ->name('reports.services.generate');
+
+    // ===== LAYOUT REPORT INVENTORY =====
+    Route::get('/reports/layout/{type}', [ReportLayoutController::class, 'edit'])
+        ->name('reports.layout.edit');
+
+    Route::post('/reports/layout/{type}', [ReportLayoutController::class, 'save'])
+        ->name('reports.layout.save');
+
+});
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');

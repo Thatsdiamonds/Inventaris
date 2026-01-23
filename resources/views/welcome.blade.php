@@ -46,6 +46,7 @@
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
                 <button type="submit">Logout ({{ Auth::user()->name }})</button>
+               <a href="{{ route('reports.menu') }}" class="btn btn-primary">Report</a>
             </form>
         </div>
 
