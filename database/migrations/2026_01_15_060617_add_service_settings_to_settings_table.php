@@ -21,7 +21,7 @@ return new class extends Migration
             \App\Models\Setting::create([
                 'nama_gereja' => 'Inventaris Management',
                 'maintenance_threshold' => 30,
-                'currency' => 'IDR'
+                'currency' => 'IDR',
             ]);
         }
     }

@@ -13,7 +13,7 @@ return new class extends Migration
 {
     Schema::create('report_layouts', function (Blueprint $table) {
     $table->id();
-    $table->string('report_type'); // inventory | service
+    $table->string('report_type');
     $table->json('columns');
     $table->timestamps();
 });

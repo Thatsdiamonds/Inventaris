@@ -52,110 +52,164 @@ class QrController extends Controller
         $request->validate([
             'item_ids' => 'required|array',
             'item_ids.*' => 'exists:items,id',
-            'church_name' => 'required|string',
+            'format' => 'nullable|string|in:pdf,zip,img',
         ]);
 
         $itemIds = $request->input('item_ids');
-        $churchName = $request->input('church_name');
-        
-        $items = Item::with('location')->whereIn('id', $itemIds)->get();
+        $format = $request->input('format', 'pdf');
+        $items = Item::with(['location', 'category'])->whereIn('id', $itemIds)->get();
 
-        $zip = new ZipArchive;
-        $zipFileName = 'qr_labels_' . time() . '.zip';
-        $zipPath = storage_path('app/public/' . $zipFileName);
-        
-        if (!file_exists(dirname($zipPath))) {
-            mkdir(dirname($zipPath), 0755, true);
-        }
+        $setting = \App\Models\Setting::first();
+        $appName = $setting->nama_gereja ?? 'Inventaris';
 
-        if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
-            
-            foreach ($items as $item) {
-                $imgContent = $this->createLabelImage($item, $churchName);
-                
-                $fileName = $item->uqcode . '.jpg';
-                $zip->addFromString($fileName, $imgContent);
-            }
-            
-            $zip->close();
-        } else {
-            return back()->with('error', 'Failed to create zip file.');
-        }
-
-        return response()->download($zipPath)->deleteFileAfterSend(true);
-    }
-
-    private function createLabelImage($item, $headerText)
-    {
-        $qrContent = sprintf(
-            "Kode: %s\nNama: %s\nLokasi: %s\nKategori: %s",
-            $item->uqcode,
-            $item->name,
-            $item->location->name ?? '-',
-            $item->category->name ?? '-'
-        );
-
-        $qrCode = new QrCode(
-            data: $qrContent,
-            encoding: new Encoding('UTF-8'),
-            errorCorrectionLevel: ErrorCorrectionLevel::High,
-            size: 130,
-            margin: 0,
-            roundBlockSizeMode: \Endroid\QrCode\RoundBlockSizeMode::Margin
-        );
+        $layout = \App\Models\ReportLayout::where('report_type', 'qr')->first();
+        $columns = $layout && $layout->columns ? json_decode($layout->columns, true) : [
+            'church_name',
+            'location.name',
+            'uqcode',
+            'created_at',
+            'acquisition_date',
+            'qr_code'
+        ];
+        $customCss = $layout->css ?? '';
 
         $writer = new PngWriter();
-        $result = $writer->write($qrCode);
-        $qrRaw = $result->getString();
 
-        $width = 400;
-        $height = 250;
-        $im = imagecreate($width, $height);
+        if ($format === 'zip') {
+            $zip = new ZipArchive;
+            $zipFileName = 'qr_labels_' . time() . '.zip';
+            $zipPath = storage_path('app/public/' . $zipFileName);
+
+            if (!file_exists(dirname($zipPath))) {
+                mkdir(dirname($zipPath), 0755, true);
+            }
+
+            if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
+                foreach ($items as $item) {
+                    $imgContent = $this->createLabelImageGD($item, $appName, $columns);
+                    $zip->addFromString($item->uqcode . '.jpg', $imgContent);
+                }
+                $zip->close();
+            }
+            return response()->download($zipPath)->deleteFileAfterSend(true);
+        }
+
+        if ($format === 'img' && $items->count() === 1) {
+            $item = $items->first();
+            $imgContent = $this->createLabelImageGD($item, $appName, $columns);
+            return response($imgContent)
+                ->header('Content-Type', 'image/jpeg')
+                ->header('Content-Disposition', 'attachment; filename="'.$item->uqcode.'.jpg"');
+        }
+
+        // PDF Logic
+        $qrCodes = [];
+        foreach ($items as $item) {
+            $qrContent = sprintf(
+                "Kode: %s\nNama: %s\nLokasi: %s\nKategori: %s",
+                $item->uqcode,
+                $item->name,
+                $item->location->name ?? '-',
+                $item->category->name ?? '-'
+            );
+
+            $qrCode = new QrCode(
+                data: $qrContent,
+                encoding: new Encoding('UTF-8'),
+                errorCorrectionLevel: ErrorCorrectionLevel::High,
+                size: 200,
+                margin: 0
+            );
+
+            $result = $writer->write($qrCode);
+            $qrCodes[$item->id] = base64_encode($result->getString());
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('qr.pdf', [
+            'items' => $items,
+            'qrCodes' => $qrCodes,
+            'appName' => $appName,
+            'columns' => $columns,
+            'customCss' => $customCss
+        ]);
+
+        return $pdf->stream('qr_labels.pdf');
+    }
+
+    private function createLabelImageGD($item, $appName, $columns)
+    {
+        $padding = 20;
+        $gap = 30;
+        $qrSize = 150;
+        $lineSpacing = 8;
+
+        // Prepare lines and calculate dimensions
+        $lines = [];
+        $maxTextWidth = 0;
+        $textTotalHeight = 0;
+
+        foreach ($columns as $col) {
+            if ($col === 'qr_code') continue;
+
+            $text = '';
+            $font = 4;
+            if ($col == 'church_name') { $text = $appName; $font = 5; }
+            elseif ($col == 'location.name') $text = "Ruang                  : " . ($item->location->name ?? '-');
+            elseif ($col == 'uqcode') $text = "Kode Barang            : " . $item->uqcode;
+            elseif ($col == 'created_at') $text = "Tahun Inventarisi      : " . ($item->created_at ? $item->created_at->format('Y') : '-');
+            elseif ($col == 'acquisition_date') $text = "Tahun Perolehan        : " . ($item->acquisition_date ? $item->acquisition_date->format('Y') : '-');
+
+            if ($text) {
+                $w = imagefontwidth($font) * strlen($text);
+                if ($w > $maxTextWidth) $maxTextWidth = $w;
+                $lines[] = ['text' => $text, 'font' => $font];
+            }
+        }
+
+        foreach ($lines as $i => $line) {
+            $textTotalHeight += imagefontheight($line['font']);
+            if ($i < count($lines) - 1) $textTotalHeight += $lineSpacing;
+        }
+
+        $hasQr = in_array('qr_code', $columns);
         
-        // Colors
+        // Final Dimensions
+        $totalWidth = $maxTextWidth + ($hasQr ? ($gap + $qrSize) : 0) + ($padding * 2);
+        $totalHeight = max($textTotalHeight, ($hasQr ? $qrSize : 0)) + ($padding * 2);
+
+        $im = imagecreatetruecolor($totalWidth, $totalHeight);
         $white = imagecolorallocate($im, 255, 255, 255);
         $black = imagecolorallocate($im, 0, 0, 0);
+        imagefilledrectangle($im, 0, 0, $totalWidth, $totalHeight, $white);
+        imagerectangle($im, 0, 0, $totalWidth - 1, $totalHeight - 1, $black);
 
-        // Border
-        imagerectangle($im, 0,0, $width-1, $height-1, $black);
+        // Render QR
+        if ($hasQr) {
+            $qrContent = sprintf(
+                "Kode: %s\nNama: %s\nLokasi: %s\nKategori: %s",
+                $item->uqcode, $item->name, $item->location->name ?? '-', $item->category->name ?? '-'
+            );
+            $qrCode = new QrCode(data: $qrContent, size: $qrSize, margin: 0);
+            $writer = new PngWriter();
+            $qrImg = imagecreatefromstring($writer->write($qrCode)->getString());
+            
+            $qrX = $totalWidth - $qrSize - $padding;
+            $qrY = ($totalHeight - $qrSize) / 2;
+            imagecopyresampled($im, $qrImg, (int)$qrX, (int)$qrY, 0, 0, $qrSize, $qrSize, imagesx($qrImg), imagesy($qrImg));
+            imagedestroy($qrImg);
+        }
 
-        // Header (Church Name) - Font 5 is largest built-in
-        $font = 5;
-        $headerX = ($width - imagefontwidth($font) * strlen($headerText)) / 2;
-        imagestring($im, $font, $headerX, 10, $headerText, $black);
+        // Render Text (Vertical Center)
+        $currentY = $padding + ($totalHeight - ($padding * 2) - $textTotalHeight) / 2;
+        foreach ($lines as $line) {
+            imagestring($im, $line['font'], $padding, (int)$currentY, $line['text'], $black);
+            $currentY += imagefontheight($line['font']) + $lineSpacing;
+        }
 
-        // QR Code processing
-        $qrImg = imagecreatefromstring($qrRaw);
-        $qrW = imagesx($qrImg);
-        $qrH = imagesy($qrImg);
-        
-        // Place QR in center
-        $dstX = ($width - $qrW) / 2;
-        $dstY = 40;
-        imagecopy($im, $qrImg, $dstX, $dstY, 0, 0, $qrW, $qrH);
-
-        // Footer Text
-        $uqcode = $item->uqcode;
-        $loc = $item->location->name ?? '-';
-        
-        $fontSmall = 4;
-        
-        // UQCODE
-        $textX = ($width - imagefontwidth($font) * strlen($uqcode)) / 2;
-        imagestring($im, $font, $textX, $dstY + $qrH + 10, $uqcode, $black);
-        
-        // Location
-        $locX = ($width - imagefontwidth($fontSmall) * strlen($loc)) / 2;
-        imagestring($im, $fontSmall, $locX, $dstY + $qrH + 35, $loc, $black);
-
-        // Capture Output
         ob_start();
-        imagejpeg($im);
+        imagejpeg($im, null, 90);
         $content = ob_get_clean();
-        
         imagedestroy($im);
-        imagedestroy($qrImg);
-
         return $content;
     }
 }

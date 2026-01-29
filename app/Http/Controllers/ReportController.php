@@ -20,17 +20,38 @@ class ReportController extends Controller
 
     public function index()
     {
+        $user = auth()->user();
+        $authLocIds = [];
+        $locations = Location::all();
+        $items = Item::all();
+
+        if (!$user->isRoot()) {
+            $authLocs = $user->authorizedLocations();
+            if ($authLocs->isNotEmpty()) {
+                $authLocIds = $authLocs->pluck('id');
+                $locations = $authLocs;
+                $items = Item::whereIn('location_id', $authLocIds)->get();
+            }
+        }
+
         return view('reports.index', [
-            'items' => Item::all(),
+            'items' => $items,
             'categories' => Category::all(),
-            'locations' => Location::all(),
+            'locations' => $locations,
         ]);
-         dd(config('report_fields.inventory'));
     }
 
    public function generate(Request $request)
     {
     $query = Item::with(['location', 'category']);
+    
+    $user = auth()->user();
+    if (!$user->isRoot()) {
+        $authLocs = $user->authorizedLocations();
+        if ($authLocs->isNotEmpty()) {
+            $query->whereIn('location_id', $authLocs->pluck('id'));
+        }
+    }
     if ($request->scope === 'barang' && $request->filled('item_id')) {
     $query->where('id', $request->item_id);
     }

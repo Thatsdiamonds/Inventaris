@@ -20,6 +20,15 @@ class ItemController extends Controller
             $query->where('is_active', true);
         }
 
+        // Location-based Access Check
+        $user = auth()->user();
+        if (!$user->isRoot()) {
+            $authorizedLocations = $user->authorizedLocations();
+            if ($authorizedLocations->isNotEmpty()) {
+                $query->whereIn('location_id', $authorizedLocations->pluck('id'));
+            }
+        }
+
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'LIKE', "%$search%")
@@ -74,7 +83,10 @@ class ItemController extends Controller
             $query->orderBy('name', 'asc');
         }
 
-        $perPage = $request->input('per_page', 10);
+        $setting = \App\Models\Setting::first();
+        $defaultPagination = $setting->default_pagination ?? 15;
+
+        $perPage = $request->input('per_page', $defaultPagination);
         $enablePagination = $request->input('pagination', 'on') === 'on';
 
         if ($enablePagination) {
@@ -87,7 +99,14 @@ class ItemController extends Controller
         }
 
         $categories = Category::all();
+        
         $locations = Location::all();
+        if (!$user->isRoot()) {
+            $authLocs = $user->authorizedLocations();
+            if ($authLocs->isNotEmpty()) {
+                $locations = $authLocs;
+            }
+        }
 
         return view('items.index', compact('items', 'categories', 'locations', 'enablePagination'));
     }
@@ -95,7 +114,11 @@ class ItemController extends Controller
     public function create()
     {
         $categories = Category::all();
-        $locations = Location::all();
+        $user = auth()->user();
+        $locations = $user->authorizedLocations();
+        if ($locations->isEmpty()) {
+            $locations = Location::all();
+        }
 
         return view('items.create', compact('categories', 'locations'));
     }
@@ -152,9 +175,23 @@ class ItemController extends Controller
             $validated['last_service_date'] = $validated['acquisition_date'];
         }
 
-        Item::create($validated);
+        $item = Item::create($validated);
 
-        return redirect()->route('items.index')->with('success', 'Item created successfully. Code: '.$validated['uqcode']);
+        $redirect = redirect()->route('items.index')->with('success', 'Item created successfully. Code: '.$validated['uqcode']);
+        
+        if ($request->input('auto_qr') == '1') {
+            $redirect->with('auto_download_id', $item->id);
+        }
+
+        return $redirect;
+    }
+
+    public function quickQr(Item $item)
+    {
+        return redirect()->route('qr.generate', [
+            'item_ids' => [$item->id],
+            'format' => 'img'
+        ]);
     }
 
     public function show(Item $item)
@@ -164,8 +201,16 @@ class ItemController extends Controller
 
     public function edit(Item $item)
     {
+        $user = auth()->user();
+        if (!$user->canAccessLocation($item->location_id)) {
+            abort(403, 'Anda tidak memiliki akses ke barang di lokasi ini.');
+        }
+
         $categories = Category::all();
-        $locations = Location::all();
+        $locations = $user->authorizedLocations();
+        if ($locations->isEmpty()) {
+            $locations = Location::all();
+        }
 
         if (request()->ajax()) {
             return view('items.edit_partial', compact('item', 'categories', 'locations'))->render();
@@ -222,7 +267,13 @@ class ItemController extends Controller
 
         $item->update($validated);
 
-        return redirect()->route('items.index')->with('success', 'Item updated successfully.');
+        $redirect = redirect()->route('items.index')->with('success', 'Item updated successfully.');
+
+        if ($request->input('auto_qr') == '1') {
+            $redirect->with('auto_download_id', $item->id);
+        }
+
+        return $redirect;
     }
 
     public function destroy(Item $item)

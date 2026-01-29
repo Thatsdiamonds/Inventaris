@@ -17,10 +17,27 @@ class ServiceController extends Controller
         $locationId = $request->input('location_id');
         $categoryId = $request->input('category_id');
 
-        $categories = Category::orderBy('name')->get();
-        $locations = Location::orderBy('name')->get();
+        $user = auth()->user();
+        $authLocIds = [];
+        if (!$user->isRoot()) {
+            $authLocs = $user->authorizedLocations();
+            if ($authLocs->isNotEmpty()) {
+                $authLocIds = $authLocs->pluck('id')->toArray();
+            }
+        }
 
-        $applyServiceFilters = function ($query) use ($search, $locationId, $categoryId) {
+        $categories = Category::orderBy('name')->get();
+        $locations = Location::orderBy('name');
+        if (!empty($authLocIds)) {
+            $locations->whereIn('id', $authLocIds);
+        }
+        $locations = $locations->get();
+
+        $applyServiceFilters = function ($query) use ($search, $locationId, $categoryId, $authLocIds) {
+            if (!empty($authLocIds)) {
+                $query->whereHas('item', fn($q) => $q->whereIn('location_id', $authLocIds));
+            }
+
             if ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereHas('item', function ($iq) use ($search) {
@@ -39,7 +56,11 @@ class ServiceController extends Controller
             }
         };
 
-        $applyItemFilters = function ($query) use ($search, $locationId, $categoryId) {
+        $applyItemFilters = function ($query) use ($search, $locationId, $categoryId, $authLocIds) {
+            if (!empty($authLocIds)) {
+                $query->whereIn('location_id', $authLocIds);
+            }
+
             if ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'LIKE', "%$search%")
@@ -113,10 +134,14 @@ class ServiceController extends Controller
         $allItems = $allItemsQuery->orderBy('name')->paginate(20, ['*'], 'all_page')->withQueryString();
 
         $counts = [
-            'in_service' => Service::whereNull('date_out')->count(),
+            'in_service' => Service::whereNull('date_out')
+                ->when(!empty($authLocIds), function($q) use ($authLocIds) {
+                    $q->whereHas('item', fn($iq) => $iq->whereIn('location_id', $authLocIds));
+                })->count(),
             'needs_service' => Item::where('is_active', true)
                 ->where('service_required', true)
                 ->whereNotNull('service_interval_days')
+                ->when(!empty($authLocIds), fn($q) => $q->whereIn('location_id', $authLocIds))
                 ->where(function ($q) use ($today) {
                     $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
                     $q->whereRaw("$rawNextDate <= ?", [$today]);
@@ -127,6 +152,7 @@ class ServiceController extends Controller
             'upcoming' => Item::where('is_active', true)
                 ->where('service_required', true)
                 ->whereNotNull('service_interval_days')
+                ->when(!empty($authLocIds), fn($q) => $q->whereIn('location_id', $authLocIds))
                 ->where(function ($q) use ($today, $thirtyDaysLater) {
                     $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
                     $q->whereRaw("$rawNextDate > ?", [$today])

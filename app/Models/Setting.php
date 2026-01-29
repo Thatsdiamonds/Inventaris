@@ -12,5 +12,8 @@ class Setting extends Model
         'logo_path',
         'maintenance_threshold',
         'currency',
+        'auto_download_after_add',
+        'auto_download_after_edit',
+        'default_pagination',
     ];
 }
