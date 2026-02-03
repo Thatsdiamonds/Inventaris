@@ -1,65 +1,112 @@
 @extends('layouts.app')
 
 @section('content')
-    <h1>Manajemen Pengguna</h1>
-
-    <div style="margin-bottom: 20px;">
-        <a href="{{ route('users.create') }}" wire:navigate
-            style="background: #1890ff; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">Tambah
-            Pengguna Baru</a>
+    <div class="page-header flex-between mb-3">
+        <div>
+            <h1 class="mb-0">Daftar Pengguna</h1>
+            <p class="text-secondary">Kelola akses dan hak istimewa pengguna sistem</p>
+        </div>
+        <a href="{{ route('users.create') }}" wire:navigate class="btn btn-primary btn-sm">
+            <svg class="icon icon-sm">
+                <use href="#icon-plus"></use>
+            </svg>
+            Tambah Pengguna
+        </a>
     </div>
 
     @if (session('success'))
-        <div style="color: green; background: #e6ffed; padding: 10px; border: 1px solid green; margin-bottom: 15px;">
-            {{ session('success') }}</div>
+        <div class="alert alert-success py-2 mb-3 slide-in-down">
+            <svg class="icon icon-sm">
+                <use href="#icon-check"></use>
+            </svg>
+            {{ session('success') }}
+        </div>
     @endif
 
-    <table border="1" cellspacing="0" cellpadding="10" style="width: 100%; border-collapse: collapse; background: #fff;">
-        <thead>
-            <tr style="background: #fafafa;">
-                <th>Nama Lengkap</th>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Catatan</th>
-                <th>Aksi</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($users as $user)
+    <div class="filter-box mb-3">
+        <form method="GET" action="{{ route('users.index') }}">
+            <div style="grid-column: span 3;">
+                <label>Cari Pengguna</label>
+                <div class="search-wrapper">
+                    <input type="text" name="search" value="{{ request('search') }}"
+                        placeholder="Nama atau username...">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-search"></use>
+                    </svg>
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-accent btn-sm" style="flex: 1;">Filter</button>
+                <a href="{{ route('users.index') }}" wire:navigate class="btn btn-ghost btn-sm" style="padding: 0 0.75rem;">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-refresh"></use>
+                    </svg>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
                 <tr>
-                    <td>
-                        {{ $user->name }}
-                        @if ($user->isRoot())
-                            <span
-                                style="background: #000; color: #fff; padding: 2px 5px; border-radius: 3px; font-size: 0.75em; vertical-align: middle;">ROOT</span>
-                        @endif
-                    </td>
-                    <td>{{ $user->username }}</td>
-                    <td>
-                        @if ($user->isRoot())
-                            <span style="color: #666; font-style: italic;">Super Admin</span>
-                        @elseif($user->assignedRole)
-                            <strong>{{ $user->assignedRole->name }}</strong>
-                        @else
-                            <span style="color: #ff4d4f;">Tanpa Role</span>
-                        @endif
-                    </td>
-                    <td style="color: #666; font-size: 0.9em;">{{ $user->notes ?? '-' }}</td>
-                    <td>
-                        @if (!$user->isRoot())
-                            <a href="{{ route('users.edit', $user->id) }}" wire:navigate>Edit</a> |
-                            <form action="{{ route('users.destroy', $user->id) }}" method="POST" style="display: inline;">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" onclick="return confirm('Hapus pengguna ini?')"
-                                    style="background: none; border: none; color: red; cursor: pointer; padding: 0;">Hapus</button>
-                            </form>
-                        @else
-                            -
-                        @endif
-                    </td>
+                    <th>Informasi Pengguna</th>
+                    <th>Username</th>
+                    <th style="width: 200px;">Peran (Role)</th>
+                    <th>Catatan</th>
+                    <th style="width: 150px; text-align: right;">Aksi</th>
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach ($users as $u)
+                    <tr>
+                        <td>
+                            <div style="font-weight: 600; color: var(--color-primary);">{{ $u->name }}</div>
+                            @if ($u->isRoot())
+                                <span class="badge badge-primary" style="font-size: 0.6rem;">ROOT SYSTEM</span>
+                            @endif
+                        </td>
+                        <td><code
+                                style="background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: 4px;">{{ $u->username }}</code>
+                        </td>
+                        <td>
+                            @if ($u->isRoot())
+                                <span class="text-muted" style="font-style: italic;">Full System Access</span>
+                            @elseif($u->assignedRole)
+                                <span class="badge badge-accent">{{ $u->assignedRole->name }}</span>
+                            @else
+                                <span class="badge badge-danger">Akses Dibatasi</span>
+                            @endif
+                        </td>
+                        <td class="text-muted" style="font-size: 0.85rem;">{{ $u->notes ?? '-' }}</td>
+                        <td style="text-align: right;">
+                            @if (!$u->isRoot())
+                                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                    <a href="{{ route('users.edit', $u->id) }}" wire:navigate class="btn btn-ghost btn-sm"
+                                        title="Edit">
+                                        <svg class="icon icon-sm">
+                                            <use href="#icon-edit"></use>
+                                        </svg>
+                                    </a>
+                                    <form action="{{ route('users.destroy', $u->id) }}" method="POST"
+                                        style="display: inline;" onsubmit="return confirm('Hapus pengguna ini?')">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-ghost btn-sm" style="color: var(--color-danger);"
+                                            title="Hapus">
+                                            <svg class="icon icon-sm">
+                                                <use href="#icon-trash"></use>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            @else
+                                <span class="text-muted" style="font-size: 0.8rem;">(System Locked)</span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+        {{ $users->links('vendor.pagination.custom') }}
+    </div>
 @endsection

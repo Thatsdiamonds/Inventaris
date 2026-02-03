@@ -17,7 +17,20 @@ class QrController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Item::with(['category', 'location']);
+        $user = auth()->user();
+        $authLocIds = [];
+        if (!$user->isRoot()) {
+            $authLocs = $user->authorizedLocations();
+            if ($authLocs->isNotEmpty()) {
+                $authLocIds = $authLocs->pluck('id')->toArray();
+            }
+        }
+
+        $query = Item::with(['category', 'location'])->where('is_active', true);
+
+        if (!empty($authLocIds)) {
+            $query->whereIn('location_id', $authLocIds);
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -36,10 +49,15 @@ class QrController extends Controller
             $query->where('condition', $request->input('condition'));
         }
 
-        $items = $query->orderBy('uqcode')->get();
+        $perPage = $request->input('per_page', 10);
+        $items = $query->orderBy('uqcode')->paginate($perPage)->withQueryString();
         
-        $categories = Category::all();
-        $locations = Location::all();
+        $categories = Category::orderBy('name')->get();
+        $locations = Location::orderBy('name');
+        if (!empty($authLocIds)) {
+            $locations->whereIn('id', $authLocIds);
+        }
+        $locations = $locations->get();
 
         $setting = \App\Models\Setting::first();
         $appName = $setting->nama_gereja ?? 'Inventaris';
@@ -48,6 +66,30 @@ class QrController extends Controller
     }
 
     public function generate(Request $request)
+    {
+        $request->validate([
+            'item_ids' => 'required|array',
+            'item_ids.*' => 'exists:items,id',
+            'format' => 'nullable|string|in:pdf,zip,img',
+        ]);
+
+        // Smart Redirect: If it's a GET request for a single image, download directly
+        // This is primarily for the "Quick QR" icon in the Item Index.
+        if ($request->isMethod('get') && $request->input('format') === 'img') {
+            return $this->downloadFile($request);
+        }
+
+        return view('items.download_qr', [
+            'title' => 'Menyiapkan Label QR',
+            'message' => 'File label sedang diproses untuk ' . count($request->item_ids) . ' barang.',
+            'downloadUrl' => route('qr.download_file'),
+            'redirectUrl' => route('qr.index'),
+            'method' => 'POST',
+            'params' => $request->all()
+        ]);
+    }
+
+    public function downloadFile(Request $request)
     {
         $request->validate([
             'item_ids' => 'required|array',
@@ -91,49 +133,54 @@ class QrController extends Controller
                 }
                 $zip->close();
             }
-            return response()->download($zipPath)->deleteFileAfterSend(true);
-        }
-
-        if ($format === 'img' && $items->count() === 1) {
+            $response = response()->download($zipPath)->deleteFileAfterSend(true);
+        } elseif ($format === 'img' && $items->count() === 1) {
             $item = $items->first();
             $imgContent = $this->createLabelImageGD($item, $appName, $columns);
-            return response($imgContent)
+            $response = response($imgContent)
                 ->header('Content-Type', 'image/jpeg')
-                ->header('Content-Disposition', 'attachment; filename="'.$item->uqcode.'.jpg"');
+                ->header('Content-Disposition', 'attachment; filename="' . $item->uqcode . '.jpg"');
+        } else {
+            // PDF Logic
+            $qrCodes = [];
+            foreach ($items as $item) {
+                $qrContent = sprintf(
+                    "Kode: %s\nNama: %s\nLokasi: %s\nKategori: %s",
+                    $item->uqcode,
+                    $item->name,
+                    $item->location->name ?? '-',
+                    $item->category->name ?? '-'
+                );
+
+                $qrCode = new QrCode(
+                    data: $qrContent,
+                    encoding: new Encoding('UTF-8'),
+                    errorCorrectionLevel: ErrorCorrectionLevel::High,
+                    size: 200,
+                    margin: 0
+                );
+
+                $result = $writer->write($qrCode);
+                $qrCodes[$item->id] = base64_encode($result->getString());
+            }
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('qr.pdf', [
+                'items' => $items,
+                'qrCodes' => $qrCodes,
+                'appName' => $appName,
+                'columns' => $columns,
+                'customCss' => $customCss
+            ]);
+
+            $response = $pdf->download('qr_labels-' . time() . '.pdf');
         }
 
-        // PDF Logic
-        $qrCodes = [];
-        foreach ($items as $item) {
-            $qrContent = sprintf(
-                "Kode: %s\nNama: %s\nLokasi: %s\nKategori: %s",
-                $item->uqcode,
-                $item->name,
-                $item->location->name ?? '-',
-                $item->category->name ?? '-'
-            );
-
-            $qrCode = new QrCode(
-                data: $qrContent,
-                encoding: new Encoding('UTF-8'),
-                errorCorrectionLevel: ErrorCorrectionLevel::High,
-                size: 200,
-                margin: 0
-            );
-
-            $result = $writer->write($qrCode);
-            $qrCodes[$item->id] = base64_encode($result->getString());
+        // Sinkronisasi: Set cookie agar client tahu file sudah dikirim
+        if ($request->has('download_token')) {
+            $response->withCookie(cookie('download_status', $request->download_token, 1, '/', null, false, false));
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('qr.pdf', [
-            'items' => $items,
-            'qrCodes' => $qrCodes,
-            'appName' => $appName,
-            'columns' => $columns,
-            'customCss' => $customCss
-        ]);
-
-        return $pdf->stream('qr_labels.pdf');
+        return $response;
     }
 
     private function createLabelImageGD($item, $appName, $columns)

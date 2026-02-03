@@ -1,102 +1,153 @@
 @extends('layouts.app')
 
 @section('content')
-    <h2>Laporan Inventaris</h2>
+    <div class="page-header mb-4">
+        <h1 class="mb-0">Laporan Inventaris</h1>
+        <p class="text-secondary">Filter dan cetak laporan daftar barang secara spesifik.</p>
+    </div>
 
-    <form method="POST" action="{{ route('reports.inventory.generate') }}"
-        style="background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee;">
-        @csrf
+    <div class="card" style="max-width: 800px;">
+        <form method="POST" action="{{ route('reports.inventory.generate') }}">
+            @csrf
 
-        <label><strong>Scope Laporan</strong></label>
-        <select name="scope" id="scope" required
-            style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px;">
-            <option value="">-- pilih --</option>
-            <option value="lokasi">Lokasi</option>
-            <option value="kategori">Kategori</option>
-            <option value="barang">Barang</option>
-        </select>
+            <!-- Scope Section -->
+            <div class="form-section mb-4">
+                <h3 class="mb-3"
+                    style="font-size: 1rem; border-bottom: 1px solid var(--color-border-light); padding-bottom: 0.5rem;">
+                    1. Cakupan Laporan
+                </h3>
 
-        <hr>
+                <div class="form-group mb-4">
+                    <label>Pilih Scope Data</label>
+                    <select name="scope" id="scope" required class="form-select" onchange="toggleScope(this.value)">
+                        <option value="">-- Pilih Cakupan --</option>
+                        <option value="lokasi">Berdasarkan Lokasi</option>
+                        <option value="kategori">Berdasarkan Kategori</option>
+                        <option value="barang">Barang Spesifik</option>
+                        <option value="semua">Semua Barang</option>
+                    </select>
+                </div>
 
-        {{-- SCOPE LOKASI --}}
-        <div id="lokasi" class="scope" style="margin-bottom: 15px;">
-            <label><strong>Lokasi</strong></label><br>
-            @foreach ($locations as $l)
-                <label style="display: block; margin: 5px 0;">
-                    <input type="checkbox" name="locations[]" value="{{ $l->id }}">
-                    {{ $l->name }}
-                </label>
-            @endforeach
-        </div>
+                {{-- SCOPE LOKASI --}}
+                <div id="lokasi" class="scope-content"
+                    style="display: none; background: var(--color-bg-secondary); padding: 1rem; border-radius: var(--radius-md);">
+                    <label class="mb-2 block font-semibold">Pilih Lokasi</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem;">
+                        @foreach ($locations as $l)
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="locations[]" value="{{ $l->id }}">
+                                <span>{{ $l->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
 
-        {{-- SCOPE KATEGORI --}}
-        <div id="kategori" class="scope" style="margin-bottom: 15px;">
-            <label><strong>Kategori</strong></label><br>
-            @foreach ($categories as $c)
-                <label style="display: block; margin: 5px 0;">
-                    <input type="checkbox" name="categories[]" value="{{ $c->id }}">
-                    {{ $c->name }}
-                </label>
-            @endforeach
-        </div>
+                {{-- SCOPE KATEGORI --}}
+                <div id="kategori" class="scope-content"
+                    style="display: none; background: var(--color-bg-secondary); padding: 1rem; border-radius: var(--radius-md);">
+                    <label class="mb-2 block font-semibold">Pilih Kategori</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem;">
+                        @foreach ($categories as $c)
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="categories[]" value="{{ $c->id }}">
+                                <span>{{ $c->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
 
-        {{-- SCOPE BARANG --}}
-        <div id="barang" class="scope" style="margin-bottom: 15px;">
-            <label><strong>Barang</strong></label>
-            <select name="item_id" style="width: 100%; padding: 8px; margin-top: 5px;">
-                <option value="">-- pilih barang --</option>
-                @foreach ($items as $i)
-                    <option value="{{ $i->id }}">{{ $i->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <hr>
-
-        <label><strong>Kondisi</strong></label>
-        <select name="condition" style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px;">
-            <option value="all">Semua</option>
-            <option value="Baik">Baik</option>
-            <option value="Rusak">Rusak</option>
-            <option value="Perbaikan">Perbaikan</option>
-        </select>
-
-        <hr>
-
-        <label><strong>Periode</strong></label>
-        <div style="display: flex; gap: 15px; margin-top: 10px; margin-bottom: 15px;">
-            <div style="flex: 1;">
-                <label>Dari</label>
-                <input type="date" name="from" style="width: 100%; padding: 8px; margin-top: 5px;">
+                {{-- SCOPE BARANG --}}
+                <div id="barang" class="scope-content"
+                    style="display: none; background: var(--color-bg-secondary); padding: 1rem; border-radius: var(--radius-md);">
+                    <label class="mb-2 block font-semibold">Pilih Barang</label>
+                    <div class="search-wrapper bg-white">
+                        <select name="item_id" class="form-select" style="width: 100%;">
+                            <option value="">-- Cari Barang --</option>
+                            @foreach ($items as $i)
+                                <option value="{{ $i->id }}">{{ $i->name }} ({{ $i->uqcode }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
             </div>
-            <div style="flex: 1;">
-                <label>Sampai</label>
-                <input type="date" name="to" style="width: 100%; padding: 8px; margin-top: 5px;">
+
+            <!-- Filters Section -->
+            <div class="form-section mb-4">
+                <h3 class="mb-3"
+                    style="font-size: 1rem; border-bottom: 1px solid var(--color-border-light); padding-bottom: 0.5rem;">
+                    2. Filter Tambahan
+                </h3>
+
+                <div class="form-group mb-3">
+                    <label>Kondisi Barang</label>
+                    <select name="condition" class="form-select">
+                        <option value="all">Semua Kondisi</option>
+                        <option value="Baik">Baik</option>
+                        <option value="Rusak">Rusak</option>
+                        <option value="Perbaikan">Dalam Perbaikan</option>
+                        <option value="Dimusnahkan">Dimusnahkan</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Periode Input (Tanggal Dibuat)</label>
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <input type="date" name="from" id="date_from" class="form-input">
+                        <span>s/d</span>
+                        <input type="date" name="to" id="date_to" class="form-input">
+                    </div>
+                    <div class="mt-2" style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="setDateRange(7)">7 Hari
+                            Terakhir</button>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="setDateRange(30)">30 Hari
+                            Terakhir</button>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="setDateRange(365)">1 Tahun
+                            Terakhir</button>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="clearDateRange()">Reset</button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <hr>
+            <div class="form-actions mt-5 pt-3"
+                style="border-top: 1px solid var(--color-border-light); display: flex; justify-content: space-between; align-items: center;">
+                <a href="{{ route('reports.layout.edit', 'inventory') }}" class="btn btn-ghost text-secondary">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-settings"></use>
+                    </svg>
+                    Atur Kolom Laporan
+                </a>
 
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <a href="{{ route('reports.layout.edit', 'inventory') }}"
-                style="background: #6c757d; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                Atur Konten Laporan Inventaris
-            </a>
-            <button type="submit"
-                style="background: #1890ff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                Generate PDF
-            </button>
-        </div>
-    </form>
+                <button type="submit" class="btn btn-primary">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-report"></use>
+                    </svg>
+                    Generate PDF
+                </button>
+            </div>
+        </form>
+    </div>
 
     <script>
-        document.querySelectorAll('.scope').forEach(e => e.style.display = 'none');
-
-        document.getElementById('scope').addEventListener('change', function() {
-            document.querySelectorAll('.scope').forEach(e => e.style.display = 'none');
-            if (this.value) {
-                document.getElementById(this.value).style.display = 'block';
+        function toggleScope(scope) {
+            document.querySelectorAll('.scope-content').forEach(el => el.style.display = 'none');
+            if (scope && scope !== 'semua') {
+                const target = document.getElementById(scope);
+                if (target) target.style.display = 'block';
             }
-        });
+        }
+
+        function setDateRange(days) {
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - days);
+
+            document.getElementById('date_to').valueAsDate = end;
+            document.getElementById('date_from').valueAsDate = start;
+        }
+
+        function clearDateRange() {
+            document.getElementById('date_to').value = '';
+            document.getElementById('date_from').value = '';
+        }
     </script>
 @endsection

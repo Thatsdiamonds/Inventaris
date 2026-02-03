@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemHistory;
 use App\Models\Location;
+use App\Services\ImageOptimizationService;
 use Illuminate\Http\Request;
 
 class ItemController extends Controller
@@ -51,6 +52,10 @@ class ItemController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
+        if ($request->input('show_destroyed') !== '1') {
+            $query->where('condition', '!=', 'dimusnahkan');
+        }
+
         if ($request->filled('condition')) {
             $query->where('condition', $request->condition);
         }
@@ -61,6 +66,7 @@ class ItemController extends Controller
                 $query->where('service_required', false);
             } else {
                 $query->where('service_required', true);
+                $query->where('condition', '!=', 'perbaikan');
                 $query->whereNotNull('service_interval_days');
 
                 $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
@@ -76,10 +82,12 @@ class ItemController extends Controller
             }
         }
 
-        $sort = $request->input('sort', 'name');
+        $sort = $request->input('sort', 'newest');
         if ($sort == 'name_desc') {
             $query->orderBy('name', 'desc');
-        } else {
+        } elseif ($sort == 'newest') {
+            $query->orderBy('created_at', 'desc');
+        } elseif ($sort == 'name_asc') {
             $query->orderBy('name', 'asc');
         }
 
@@ -165,7 +173,12 @@ class ItemController extends Controller
         );
 
         if ($request->hasFile('photo')) {
-            $validated['photo_path'] = $request->file('photo')->store('items', 'public');
+            $imageService = app(ImageOptimizationService::class);
+            $validated['photo_path'] = $imageService->optimizeAndStore(
+                $request->file('photo'),
+                'items',
+                ['quality' => 80, 'max_width' => 1200, 'max_height' => 1200]
+            );
         }
 
         $validated['service_required'] = $request->has('service_required');
@@ -175,15 +188,18 @@ class ItemController extends Controller
             $validated['last_service_date'] = $validated['acquisition_date'];
         }
 
+        // Remove photo from validated data as it's not a database column
+        unset($validated['photo']);
+
         $item = Item::create($validated);
 
-        $redirect = redirect()->route('items.index')->with('success', 'Item created successfully. Code: '.$validated['uqcode']);
-        
         if ($request->input('auto_qr') == '1') {
-            $redirect->with('auto_download_id', $item->id);
+            return redirect()->route('items.download_qr', $item->id)
+                ->with('success', 'Item created successfully. Code: ' . $validated['uqcode']);
         }
 
-        return $redirect;
+        return redirect()->route('items.index')
+            ->with('success', 'Item created successfully. Code: ' . $validated['uqcode']);
     }
 
     public function quickQr(Item $item)
@@ -191,6 +207,22 @@ class ItemController extends Controller
         return redirect()->route('qr.generate', [
             'item_ids' => [$item->id],
             'format' => 'img'
+        ]);
+    }
+
+    public function downloadQr(Item $item)
+    {
+        return view('items.download_qr', [
+            'item' => $item,
+            'title' => 'Mengunduh Label QR',
+            'message' => 'Gambar label untuk ' . $item->name . ' sedang disiapkan.',
+            'downloadUrl' => route('qr.download_file'),
+            'redirectUrl' => route('items.index'),
+            'method' => 'POST',
+            'params' => [
+                'item_ids' => [$item->id],
+                'format' => 'img'
+            ]
         ]);
     }
 
@@ -260,20 +292,32 @@ class ItemController extends Controller
         }
 
         if ($request->hasFile('photo')) {
-            $validated['photo_path'] = $request->file('photo')->store('items', 'public');
+            // Delete old photo if exists
+            if ($item->photo_path) {
+                $imageService = app(ImageOptimizationService::class);
+                $imageService->delete($item->photo_path);
+            }
+            $imageService = app(ImageOptimizationService::class);
+            $validated['photo_path'] = $imageService->optimizeAndStore(
+                $request->file('photo'),
+                'items',
+                ['quality' => 80, 'max_width' => 1200, 'max_height' => 1200]
+            );
         }
 
         $validated['service_required'] = $request->boolean('service_required');
 
+        // Remove photo from validated data as it's not a database column
+        unset($validated['photo']);
+
         $item->update($validated);
 
-        $redirect = redirect()->route('items.index')->with('success', 'Item updated successfully.');
-
         if ($request->input('auto_qr') == '1') {
-            $redirect->with('auto_download_id', $item->id);
+            return redirect()->route('items.download_qr', $item->id)
+                ->with('success', 'Item updated successfully.');
         }
 
-        return $redirect;
+        return redirect()->route('items.index')->with('success', 'Item updated successfully.');
     }
 
     public function destroy(Item $item)

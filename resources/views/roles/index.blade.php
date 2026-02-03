@@ -1,62 +1,90 @@
 @extends('layouts.app')
 
 @section('content')
-    <h1>Manajemen Roles</h1>
-
-    <div style="margin-bottom: 20px;">
-        <a href="{{ route('roles.create') }}" wire:navigate
-            style="background: #1890ff; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; display: inline-block;">Tambah
-            Role Baru</a>
+    <div class="page-header flex-between mb-3">
+        <div>
+            <h1 class="mb-0">Peran & Hak Akses</h1>
+            <p class="text-secondary">Definisikan izin operasional untuk setiap grup pengguna</p>
+        </div>
+        <a href="{{ route('roles.create') }}" wire:navigate class="btn btn-primary btn-sm">
+            <svg class="icon icon-sm">
+                <use href="#icon-plus"></use>
+            </svg>
+            Tambah Role
+        </a>
     </div>
 
     @if (session('success'))
-        <div style="color: green; background: #e6ffed; padding: 10px; border: 1px solid green; margin-bottom: 15px;">
-            {{ session('success') }}</div>
+        <div class="alert alert-success py-2 mb-3">
+            <svg class="icon icon-sm">
+                <use href="#icon-check"></use>
+            </svg>
+            {{ session('success') }}
+        </div>
     @endif
 
-    <table border="1" cellspacing="0" cellpadding="10" style="width: 100%; border-collapse: collapse; background: #fff;">
-        <thead>
-            <tr style="background: #fafafa;">
-                <th>Nama Role</th>
-                <th>Catatan</th>
-                <th>Izin</th>
-                <th>Lokasi</th>
-                <th>Aksi</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($roles as $role)
+    <div class="table-container">
+        <table>
+            <thead>
                 <tr>
-                    <td><strong>{{ $role->name }}</strong></td>
-                    <td style="color: #666; font-size: 0.9em;">{{ $role->notes ?? '-' }}</td>
-                    <td>
-                        <ul style="margin: 0; padding-left: 15px;">
-                            @foreach ($role->permissions ?? [] as $perm)
-                                <li><small>{{ str_replace('_', ' ', ucfirst($perm)) }}</small></li>
-                            @endforeach
-                        </ul>
-                    </td>
-                    <td>
-                        @if ($role->locations->count() > 0)
-                            @foreach ($role->locations as $loc)
-                                <span
-                                    style="background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-size: 0.85em;">{{ $loc->name }}</span>
-                            @endforeach
-                        @else
-                            <span style="color: #999; font-style: italic;">Semua Lokasi</span>
-                        @endif
-                    </td>
-                    <td>
-                        <a href="{{ route('roles.edit', $role->id) }}" wire:navigate>Edit</a> |
-                        <form action="{{ route('roles.destroy', $role->id) }}" method="POST" style="display: inline;">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" onclick="return confirm('Hapus role ini?')"
-                                style="background: none; border: none; color: red; cursor: pointer; padding: 0;">Hapus</button>
-                        </form>
-                    </td>
+                    <th style="width: 180px;">Nama Role</th>
+                    <th style="width: 200px;">Izin Akses</th>
+                    <th style="width: 250px;">Otoritas Lokasi</th>
+                    <th>Catatan</th>
+                    <th style="width: 120px; text-align: right;">Aksi</th>
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach ($roles as $r)
+                    <tr>
+                        <td>
+                            <strong style="color: var(--color-primary);">{{ $r->name }}</strong>
+                        </td>
+                        <td>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                @foreach ($r->permissions ?? [] as $perm)
+                                    <span class="badge badge-primary" style="opacity: 0.8; font-size: 0.6rem;">
+                                        {{ str_replace('_', ' ', $perm) }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+                                @if ($r->locations->count() > 0)
+                                    @foreach ($r->locations as $loc)
+                                        <span class="badge badge-accent"
+                                            style="font-size: 0.6rem;">{{ $loc->name }}</span>
+                                    @endforeach
+                                @else
+                                    <span class="text-muted" style="font-style: italic; font-size: 0.8rem;">Global (Semua
+                                        Lokasi)</span>
+                                @endif
+                            </div>
+                        </td>
+                        <td class="text-muted" style="font-size: 0.85rem;">{{ $r->notes ?? '-' }}</td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <a href="{{ route('roles.edit', $r->id) }}" wire:navigate class="btn btn-ghost btn-sm">
+                                    <svg class="icon icon-sm">
+                                        <use href="#icon-edit"></use>
+                                    </svg>
+                                </a>
+                                <form action="{{ route('roles.destroy', $r->id) }}" method="POST" style="display: inline;"
+                                    onsubmit="return confirm('Hapus role ini?')">
+                                    @csrf @method('DELETE')
+                                    <button class="btn btn-ghost btn-sm" style="color: var(--color-danger);">
+                                        <svg class="icon icon-sm">
+                                            <use href="#icon-trash"></use>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+        {{ $roles->links('vendor.pagination.custom') }}
+    </div>
 @endsection

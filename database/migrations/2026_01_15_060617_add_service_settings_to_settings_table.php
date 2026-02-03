@@ -19,7 +19,7 @@ return new class extends Migration
         // Ensure at least one setting row exists
         if (\App\Models\Setting::count() === 0) {
             \App\Models\Setting::create([
-                'nama_gereja' => 'Inventaris Management',
+                'nama_gereja' => 'Nama Gereja',
                 'maintenance_threshold' => 30,
                 'currency' => 'IDR',
             ]);

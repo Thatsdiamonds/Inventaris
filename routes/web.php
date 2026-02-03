@@ -20,7 +20,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports', [ReportController::class, 'menu'])->name('reports.menu');
         Route::get('/reports/inventory', [ReportController::class, 'index'])->name('reports.inventory');
         Route::post('/reports/inventory', [ReportController::class, 'generate'])->name('reports.inventory.generate');
+        Route::post('/reports/inventory/download-file', [ReportController::class, 'downloadFile'])->name('reports.inventory.download_file');
         Route::post('/reports/services', [ServiceReportController::class, 'generate'])->name('reports.services.generate');
+        Route::post('/reports/services/download-file', [ServiceReportController::class, 'downloadFile'])->name('reports.services.download_file');
         Route::get('/reports/layout/{type}', [ReportLayoutController::class, 'edit'])->name('reports.layout.edit');
         Route::post('/reports/layout/{type}', [ReportLayoutController::class, 'save'])->name('reports.layout.save');
     });
@@ -66,20 +68,24 @@ Route::middleware(['auth'])->group(function () {
             // Terlambat
             'overdue_count' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
+                ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate < ?", [$today])
                 ->count(),
             'overdue_latest' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
+                ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate < ?", [$today])
                 ->latest()->first(),
 
             // Akan datang
             'upcoming_count' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
+                ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate >= ?", [$today])
                 ->count(),
             'upcoming_latest' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
+                ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate >= ?", [$today])
                 ->latest()->first(),
 
@@ -99,9 +105,11 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['permission:access_items'])->group(function () {
         Route::resource('items', ItemController::class);
         Route::get('items/{item}/quick-qr', [ItemController::class, 'quickQr'])->name('items.quick_qr');
+        Route::get('items/{item}/download-qr', [ItemController::class, 'downloadQr'])->name('items.download_qr');
         Route::get('api/items/next-serial', [ItemController::class, 'getNextSerial'])->name('api.items.next-serial');
         Route::get('qr', [App\Http\Controllers\QrController::class, 'index'])->name('qr.index');
         Route::match(['get', 'post'], 'qr/generate', [App\Http\Controllers\QrController::class, 'generate'])->name('qr.generate');
+        Route::post('qr/download-file', [App\Http\Controllers\QrController::class, 'downloadFile'])->name('qr.download_file');
     });
 
     Route::middleware(['permission:access_services'])->group(function () {
@@ -109,6 +117,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('items/{item}/service', [ServiceController::class, 'create'])->name('items.service.create');
         Route::post('items/{item}/service/confirm', [ServiceController::class, 'confirm'])->name('items.service.confirm');
         Route::post('items/{item}/service/store', [ServiceController::class, 'store'])->name('items.service.store');
+        Route::get('services/{service}/finish', [ServiceController::class, 'finishForm'])->name('services.finish.form');
         Route::post('services/{service}/finish', [ServiceController::class, 'finish'])->name('services.finish');
         Route::post('services/{service}/fails', [ServiceController::class, 'fails'])->name('services.fails');
     });

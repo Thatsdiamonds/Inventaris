@@ -1,57 +1,173 @@
 @extends('layouts.app')
 
 @section('content')
-    <style>
-        .filter-box {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-        }
+    <div class="page-header mb-3">
+        <h1 class="mb-0">Cetak Label QR</h1>
+        <p class="text-secondary">Pilih barang yang ingin dibuatkan label QR Code.</p>
+    </div>
 
-        .item-checkbox {
-            transform: scale(1.2);
-            margin-right: 8px;
-        }
+    @if (session('error'))
+        <div class="alert alert-error slide-in-down py-2 mb-4">
+            <svg class="icon icon-sm">
+                <use href="#icon-alert"></use>
+            </svg>
+            {{ session('error') }}
+        </div>
+    @endif
 
-        .btn-generate {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
+    <!-- Search & Filter Section -->
+    <div class="filter-box">
+        <form method="GET" action="{{ route('qr.index') }}" onsubmit="cleanEmptyFields(this)" style="gap: 0.75rem;">
+            <div style="grid-column: span 2;">
+                <label>Cari Barang</label>
+                <div class="search-wrapper">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Nama atau kode...">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-search"></use>
+                    </svg>
+                </div>
+            </div>
 
-        .btn-reset {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
+            <div>
+                <label>Lokasi</label>
+                <select name="location_id">
+                    <option value="">Semua Lokasi</option>
+                    @foreach ($locations as $l)
+                        <option value="{{ $l->id }}" {{ request('location_id') == $l->id ? 'selected' : '' }}>
+                            {{ $l->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        /* Existing styles moved and kept if not replaced by new ones */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
+            <div>
+                <label>Kategori</label>
+                <select name="category_id">
+                    <option value="">Semua Kategori</option>
+                    @foreach ($categories as $c)
+                        <option value="{{ $c->id }}" {{ request('category_id') == $c->id ? 'selected' : '' }}>
+                            {{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        th,
-        td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
+            <div>
+                <label>Kondisi</label>
+                <select name="condition">
+                    <option value="">Semua Status</option>
+                    <option value="baik" {{ request('condition') == 'baik' ? 'selected' : '' }}>Baik</option>
+                    <option value="rusak" {{ request('condition') == 'rusak' ? 'selected' : '' }}>Rusak</option>
+                    <option value="perbaikan" {{ request('condition') == 'perbaikan' ? 'selected' : '' }}>Perbaikan
+                    </option>
+                    <option value="dimusnahkan" {{ request('condition') == 'dimusnahkan' ? 'selected' : '' }}>Dimusnahkan
+                    </option>
+                </select>
+            </div>
 
-        th {
-            background-color: #f2f2f2;
-        }
-    </style>
+            <div>
+                <label>Tampilkan</label>
+                <select name="per_page">
+                    @foreach ([10, 25, 50, 100] as $p)
+                        <option value="{{ $p }}" {{ request('per_page', 10) == $p ? 'selected' : '' }}>
+                            {{ $p }} Baris</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-accent btn-sm" style="flex: 1;">Filter</button>
+                <a href="{{ route('qr.index') }}" wire:navigate class="btn btn-ghost btn-sm" style="padding: 0 0.75rem;">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-refresh"></use>
+                    </svg>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <form method="POST" action="{{ route('qr.generate') }}">
+        @csrf
+
+        <div class="card mb-3"
+            style="background: var(--color-bg-secondary); border-color: var(--color-accent); border-style: dashed; padding: 0.75rem 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 1.5rem; align-items: center;">
+                    <div>
+                        <label
+                            style="font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase;">Organisasi</label>
+                        <div style="font-weight: 700; color: var(--color-primary);">{{ $appName }}</div>
+                    </div>
+                    <div>
+                        <label
+                            style="font-size: 0.75rem; color: var(--color-text-secondary); text-transform: uppercase;">Format
+                            Output</label>
+                        <select name="format"
+                            style="font-size: 0.875rem; background: white; padding: 4px 10px; border-radius: 6px;">
+                            <option value="pdf">PDF (Siap Cetak)</option>
+                            <option value="zip">ZIP (Kumpulan Gambar)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Barang Terpilih: <span
+                            id="selected_count"
+                            style="font-weight: 600; color: var(--color-accent); font-size: 1.25rem;">0</span></div>
+                    <button type="submit" class="btn btn-accent mt-2">
+                        <svg class="icon icon-sm">
+                            <use href="#icon-qr"></use>
+                        </svg>
+                        Cetak Label Terpilih
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;"><input type="checkbox" onclick="toggleAll(this)"
+                                style="transform: scale(1.1);"></th>
+                        <th>Kode Unik</th>
+                        <th>Nama Barang</th>
+                        <th>Kategori</th>
+                        <th>Lokasi</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($items as $item)
+                        <tr>
+                            <td><input type="checkbox" name="item_ids[]" value="{{ $item->id }}"
+                                    onchange="updateCount()" style="transform: scale(1.1);">
+                            </td>
+                            <td><code
+                                    style="background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: 4px;">{{ $item->uqcode }}</code>
+                            </td>
+                            <td style="font-weight: 600;">{{ $item->name }}</td>
+                            <td class="text-secondary">{{ $item->category->name ?? '-' }}</td>
+                            <td class="text-secondary">{{ $item->location->name ?? '-' }}</td>
+                            <td>
+                                @php
+                                    $badgeClass = match (strtolower($item->condition)) {
+                                        'baik' => 'badge-success',
+                                        'rusak' => 'badge-danger',
+                                        'perbaikan' => 'badge-warning',
+                                        default => 'badge-primary',
+                                    };
+                                @endphp
+                                <span class="badge {{ $badgeClass }}">{{ $item->condition }}</span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">Tidak ada barang ditemukan.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+            {{ $items->links('vendor.pagination.custom') }}
+        </div>
+    </form>
 
     <script>
         function toggleAll(source) {
@@ -70,95 +186,12 @@
             }
             document.getElementById('selected_count').innerText = count;
         }
+
+        function cleanEmptyFields(form) {
+            const el = form.elements;
+            for (let i = 0; i < el.length; i++) {
+                if (el[i].name && !el[i].value && el[i].tagName !== 'BUTTON') el[i].name = '';
+            }
+        }
     </script>
-
-    <div
-        style="display:flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
-        <h1>QR Code Generator</h1>
-    </div>
-
-    @if (session('error'))
-        <div style="color: red; padding: 10px; background: #ffe6e6; margin-bottom: 10px;">{{ session('error') }}</div>
-    @endif
-
-    <div class="filter-box">
-        <form method="GET" action="{{ route('qr.index') }}">
-            <strong>Filter List:</strong>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search..." style="padding: 4px;">
-
-            <select name="location_id" style="padding: 4px;">
-                <option value="">-- All Locations --</option>
-                @foreach ($locations as $l)
-                    <option value="{{ $l->id }}" {{ request('location_id') == $l->id ? 'selected' : '' }}>
-                        {{ $l->name }}</option>
-                @endforeach
-            </select>
-
-            <select name="category_id" style="padding: 4px;">
-                <option value="">-- All Categories --</option>
-                @foreach ($categories as $c)
-                    <option value="{{ $c->id }}" {{ request('category_id') == $c->id ? 'selected' : '' }}>
-                        {{ $c->name }}</option>
-                @endforeach
-            </select>
-
-            <button type="submit" class="btn-apply">Apply Filter</button>
-            <a href="{{ route('qr.index') }}" wire:navigate style="font-size: 0.9em; margin-left: 10px;">Reset</a>
-
-        </form>
-    </div>
-
-    <form method="POST" action="{{ route('qr.generate') }}" target="_blank">
-        @csrf
-
-        <div
-            style="background: #e2e3e5; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
-            <div style="display:flex; gap: 20px; align-items: center;">
-                <div>
-                    <strong>Configuration:</strong> <br>
-                    <span>Organization: <strong>{{ $appName }}</strong></span>
-                </div>
-                <div>
-                    <strong>Format:</strong> <br>
-                    <select name="format" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
-                        <option value="pdf">PDF (Printable)</option>
-                        <option value="zip">ZIP (Images)</option>
-                    </select>
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <h3 style="margin: 0;">Selected Items: <span id="selected_count">0</span></h3>
-                <p style="margin: 5px 0 0 0; color: #666;">(Total List: {{ $items->count() }})</p>
-                <button type="submit" class="btn-primary" style="margin-top: 10px;">Generate Labels</button>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th width="40"><input type="checkbox" onclick="toggleAll(this)"></th>
-                    <th>Unique Code</th>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Location</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($items as $item)
-                    <tr>
-                        <td><input type="checkbox" name="item_ids[]" value="{{ $item->id }}" onchange="updateCount()">
-                        </td>
-                        <td>{{ $item->uqcode }}</td>
-                        <td>{{ $item->name }}</td>
-                        <td>{{ $item->category->name ?? '-' }}</td>
-                        <td>{{ $item->location->name ?? '-' }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="5" style="text-align: center;">No items found.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </form>
 @endsection

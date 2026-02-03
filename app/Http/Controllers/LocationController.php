@@ -7,9 +7,16 @@ use Illuminate\Http\Request;
 
 class LocationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $locations = Location::all();
+        $query = Location::orderBy('name');
+
+        if ($search = $request->input('search')) {
+            $query->where('name', 'LIKE', "%$search%")
+                ->orWhere('unique_code', 'LIKE', "%$search%");
+        }
+
+        $locations = $query->paginate(10)->withQueryString();
         return view('locations.index', compact('locations'));
     }
 

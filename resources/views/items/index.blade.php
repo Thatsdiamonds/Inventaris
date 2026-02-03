@@ -1,191 +1,278 @@
 @extends('layouts.app')
 
 @section('content')
-    <div style="display:flex; justify-content: space-between; align-items: center;">
-        <h1>Items</h1>
+    <div class="page-header flex-between mb-3">
+        <div>
+            <h1 class="mb-0">Daftar Barang</h1>
+            <p class="text-secondary">Total: {{ $items->total() ?? $items->count() }} unit</p>
+        </div>
+        <a href="{{ route('items.create') }}" wire:navigate class="btn btn-primary btn-sm">
+            <svg class="icon icon-sm">
+                <use href="#icon-plus"></use>
+            </svg>
+            Tambah Barang
+        </a>
     </div>
 
-    <a href="{{ route('items.create') }}" wire:navigate
-        style="background: #1890ff; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; display: inline-block; margin-bottom: 20px;">Create
-        New Item</a>
-
     @if (session('success'))
-        <div style="color: green; background: #e6ffed; padding: 10px; border: 1px solid green; margin-bottom: 10px;">
-            {{ session('success') }}</div>
-    @endif
-
-    @if (session('error'))
-        <div style="color: red; background: #ffe6e6; padding: 10px; border: 1px solid red; margin-bottom: 10px;">
-            {{ session('error') }}</div>
-    @endif
-
-    <form method="GET" action="{{ route('items.index') }}" onsubmit="cleanEmptyFields(this)"
-        style="background: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-        <strong>Search:</strong>
-        <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, code, etc...">
-
-        <br><br>
-        <strong>Filters:</strong>
-        <select name="location_id">
-            <option value="">-- All Locations --</option>
-            @foreach ($locations as $l)
-                <option value="{{ $l->id }}" {{ request('location_id') == $l->id ? 'selected' : '' }}>
-                    {{ $l->name }}</option>
-            @endforeach
-        </select>
-
-        <select name="category_id">
-            <option value="">-- All Categories --</option>
-            @foreach ($categories as $c)
-                <option value="{{ $c->id }}" {{ request('category_id') == $c->id ? 'selected' : '' }}>
-                    {{ $c->name }}</option>
-            @endforeach
-        </select>
-
-        <select name="condition">
-            <option value="">-- All Conditions --</option>
-            <option value="baik" {{ request('condition') == 'baik' ? 'selected' : '' }}>Baik</option>
-            <option value="rusak" {{ request('condition') == 'rusak' ? 'selected' : '' }}>Rusak</option>
-            <option value="perbaikan" {{ request('condition') == 'perbaikan' ? 'selected' : '' }}>Perbaikan</option>
-            <option value="dimusnahkan" {{ request('condition') == 'dimusnahkan' ? 'selected' : '' }}>Dimusnahkan</option>
-        </select>
-
-        <select name="service_status">
-            <option value="">-- Maintenance Status --</option>
-            <option value="kelewatan" {{ request('service_status') == 'kelewatan' ? 'selected' : '' }}>Kelewatan</option>
-            <option value="akan_datang" {{ request('service_status') == 'akan_datang' ? 'selected' : '' }}>Akan Datang
-            </option>
-            <option value="jatuh_tempo" {{ request('service_status') == 'jatuh_tempo' ? 'selected' : '' }}>Jatuh Tempo Hari
-                Ini</option>
-        </select>
-
-        <select name="per_page">
-            <option value="10" {{ request('per_page') == '10' ? 'selected' : '' }}>10 per hal</option>
-            <option value="15" {{ request('per_page', $items->perPage() ?? 15) == '15' ? 'selected' : '' }}>15 per hal
-            </option>
-            <option value="25" {{ request('per_page') == '25' ? 'selected' : '' }}>25 per hal</option>
-            <option value="50" {{ request('per_page') == '50' ? 'selected' : '' }}>50 per hal</option>
-            <option value="100" {{ request('per_page') == '100' ? 'selected' : '' }}>100 per hal</option>
-        </select>
-
-        <button type="submit">Apply</button>
-        <a href="{{ route('items.index') }}" wire:navigate>Reset</a>
-    </form>
-
-    <table border="1" cellspacing="0" cellpadding="5" style="width:100%; border-collapse: collapse;">
-        <thead>
-            <tr style="background: #eee;">
-                <th>Photo</th>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Location</th>
-                <th>Condition</th>
-                <th>Maintenance Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($items as $item)
-                <tr>
-                    <td>
-                        @if ($item->photo_path)
-                            <img src="{{ asset('storage/' . $item->photo_path) }}" width="40"
-                                style="border-radius:4px;">
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td>{{ $item->uqcode }}</td>
-                    <td>
-                        <strong>{{ $item->name }}</strong><br>
-                        <small>{{ $item->category->name }}</small>
-                    </td>
-                    <td>{{ $item->location->name }}</td>
-                    <td style="text-transform: capitalize;">{{ $item->condition }}</td>
-                    <td>
-                        <div style="margin-bottom: 5px;">
-                            <strong>{{ $item->service_status_label }}</strong><br>
-                            <small>Terakhir Maintenance:
-                                {{ $item->last_service_date ? $item->last_service_date->format('d/m/Y') : '-' }}</small>
-                        </div>
-
-                        @if ($item->service_required && !$item->services()->whereNull('date_out')->exists())
-                            @php
-                                $today = now()->startOfDay();
-                                $next = $item->next_service_date ? $item->next_service_date->startOfDay() : null;
-                                $targetTab = $next && $next > $today ? 'upcoming' : 'needs_service';
-
-                                $queryParams = ['tab' => $targetTab, 'search' => $item->uqcode];
-                                if ($item->service_interval_days > 30) {
-                                    $queryParams['upcoming_filter'] = 'all';
-                                }
-                            @endphp
-                            <a href="{{ route('services.index', $queryParams) }}" wire:navigate
-                                style="background: #ff4d4f; color: white; padding: 2px 8px; text-decoration: none; border-radius: 3px; font-size: 0.8em; display: inline-block;">
-                                Lakukan Maintenance Berkala
-                            </a>
-                        @endif
-                    </td>
-                    <td>
-                        <div style="display:flex; flex-direction: column; gap: 5px;">
-                            @if (!$item->services()->whereNull('date_out')->exists())
-                                <a href="{{ route('items.service.create', $item->id) }}" wire:navigate
-                                    style="background: #1890ff; color: white; padding: 4px 8px; text-decoration: none; border-radius: 4px; font-size: 0.9em; text-align: center;">
-                                    Serviskan (Manual/Perbaikan)
-                                </a>
-                            @else
-                                <span style="color: #666; font-size: 0.85em; font-style: italic;">Sedang dalam proses
-                                    servis</span>
-                            @endif
-
-                            <div style="display:flex; gap: 5px; justify-content: center;">
-                                <a href="{{ route('items.quick_qr', $item->id) }}" title="Download QR"
-                                    style="font-size: 1.2em; text-decoration: none;">🖼️</a>
-                                <a href="{{ route('items.edit', $item->id) }}" wire:navigate>Edit</a>
-                                <form action="{{ route('items.destroy', $item->id) }}" method="POST"
-                                    style="display:inline;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" onclick="return confirm('Are you sure?')"
-                                        style="background:none; border:none; color:red; cursor:pointer; padding:0; font-size:1em;">Delete</button>
-                                </form>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="7" style="text-align:center;">No data found</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-
-    @if (session('auto_download_id'))
-        <script>
-            window.onload = function() {
-                setTimeout(() => {
-                    window.location.href = "{{ route('items.quick_qr', session('auto_download_id')) }}";
-                }, 500);
-            };
-        </script>
-    @endif
-
-    @if ($items instanceof \Illuminate\Pagination\LengthAwarePaginator)
-        <div style="margin-top: 15px;">
-            {{ $items->links() }}
+        <div class="alert alert-success slide-in-down py-2 mb-3" style="font-size: 0.875rem;">
+            <svg class="icon icon-sm">
+                <use href="#icon-check"></use>
+            </svg>
+            {{ session('success') }}
         </div>
     @endif
 
+    @if (session('error'))
+        <div class="alert alert-error slide-in-down py-2 mb-3" style="font-size: 0.875rem;">
+            <svg class="icon icon-sm">
+                <use href="#icon-alert"></use>
+            </svg>
+            {{ session('error') }}
+        </div>
+    @endif
+
+    <!-- Search & Filter Section -->
+    <div class="filter-box mb-3 py-3 px-3">
+        <form method="GET" action="{{ route('items.index') }}" onsubmit="cleanEmptyFields(this)" style="gap: 0.75rem;">
+            <div style="grid-column: span 2;">
+                <label>Cari Barang</label>
+                <div class="search-wrapper">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Nama atau kode...">
+                    <svg class="icon icon-sm">
+                        <use href="#icon-search"></use>
+                    </svg>
+                </div>
+            </div>
+
+            <div>
+                <label>Lokasi</label>
+                <select name="location_id">
+                    <option value="">Semua Lokasi</option>
+                    @foreach ($locations as $l)
+                        <option value="{{ $l->id }}" {{ request('location_id') == $l->id ? 'selected' : '' }}>
+                            {{ $l->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label>Kategori</label>
+                <select name="category_id">
+                    <option value="">Semua Kategori</option>
+                    @foreach ($categories as $c)
+                        <option value="{{ $c->id }}" {{ request('category_id') == $c->id ? 'selected' : '' }}>
+                            {{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label>Urutkan</label>
+                <select name="sort">
+                    <option value="newest" {{ request('sort') == 'newest' ? 'selected' : '' }}>Baru Ditambahkan</option>
+                    <option value="name_asc" {{ request('sort') == 'name_asc' ? 'selected' : '' }}>Nama (A-Z)</option>
+                    <option value="name_desc" {{ request('sort') == 'name_desc' ? 'selected' : '' }}>Nama (Z-A)</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Kondisi</label>
+                <select name="condition">
+                    <option value="">Semua Kondisi</option>
+                    <option value="baik" {{ request('condition') == 'baik' ? 'selected' : '' }}>Baik</option>
+                    <option value="rusak" {{ request('condition') == 'rusak' ? 'selected' : '' }}>Rusak</option>
+                    <option value="perbaikan" {{ request('condition') == 'perbaikan' ? 'selected' : '' }}>Perbaikan
+                    </option>
+                </select>
+            </div>
+
+            <div style="display: flex; align-items: center; padding-top: 1.25rem;">
+                <label
+                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--color-text);">
+                    <input type="checkbox" name="show_destroyed" value="1"
+                        {{ request('show_destroyed') == '1' ? 'checked' : '' }} style="width: 1rem; height: 1rem;">
+                    Lihat Barang Dimusnahkan
+                </label>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                <button type="submit" class="btn btn-accent btn-sm" style="flex: 1;">Filter</button>
+                <a href="{{ route('items.index') }}" wire:navigate class="btn btn-ghost btn-sm"
+                    style="padding: 0 0.75rem;"><svg class="icon icon-sm">
+                        <use href="#icon-refresh"></use>
+                    </svg></a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 60px;">Foto</th>
+                    <th style="width: 180px;">Kode Barang</th>
+                    <th>Informasi Barang</th>
+                    <th>Lokasi</th>
+                    <th>Pemeliharaan</th>
+                    <th>Status</th>
+                    <th style="width: 180px; text-align: right;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($items as $item)
+                    <tr>
+                        <td>
+                            @if ($item->photo_path)
+                                <img src="{{ asset('storage/' . $item->photo_path) }}" loading="lazy"
+                                    style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--color-border-light); transition: opacity 0.3s ease-in;"
+                                    onload="this.style.opacity='1'"
+                                    onerror="this.src='{{ asset('images/placeholder.png') }}'">
+                            @else
+                                <div
+                                    style="width: 40px; height: 40px; background: var(--color-bg-secondary); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--color-text-muted);">
+                                    <svg class="icon icon-md">
+                                        <use href="#icon-image"></use>
+                                    </svg>
+                                </div>
+                            @endif
+                        </td>
+                        <td>
+                            <code
+                                style="display: block; font-size: 0.8rem; letter-spacing: 0.5px; color: var(--color-primary); font-weight: 600;">
+                                {{ $item->uqcode }}
+                            </code>
+                            <span style="font-size: 0.7rem; color: var(--color-text-muted);">#{{ $item->id }}</span>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600; color: var(--color-text);">
+                                {{ $item->name }}</div>
+                            <div style="font-size: 0.8rem; color: var(--color-text-secondary);">{{ $item->category->name }}
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+                                <svg class="icon icon-sm" style="color: var(--color-text-muted);">
+                                    <use href="#icon-location"></use>
+                                </svg>
+                                {{ $item->location->name }}
+                            </span>
+                        </td>
+                        <td>
+                            @if ($item->service_required)
+                                @php
+                                    $itemStatus = $item->service_status;
+                                    $statusColor = match ($itemStatus) {
+                                        'kelewatan', 'jatuh_tempo' => 'var(--color-danger)',
+                                        'akan_datang' => 'var(--color-success)',
+                                        default => 'var(--color-text-secondary)',
+                                    };
+
+                                    // Map item status to Service Management tabs
+                                    $targetTab = match ($itemStatus) {
+                                        'sedang_servis' => 'in_service',
+                                        'kelewatan', 'jatuh_tempo' => 'needs_service',
+                                        'akan_datang' => 'upcoming',
+                                        default => 'all',
+                                    };
+                                @endphp
+                                <a href="{{ route('services.index', ['search' => $item->uqcode, 'tab' => $targetTab]) }}"
+                                    wire:navigate class="service-link"
+                                    style="text-decoration: none; display: block; padding: 4px; border-radius: 4px; border: 1px solid transparent; transition: all 0.2s;">
+                                    <div style="font-size: 0.75rem; line-height: 1.4;">
+                                        <div class="text-secondary">Status: <span
+                                                style="font-weight: 600; color: {{ $statusColor }};">{{ $item->service_status_label }}</span>
+                                        </div>
+                                        @if ($item->next_service_date)
+                                            <div class="text-muted">Target: {{ $item->next_service_date->format('d/m/Y') }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                </a>
+                            @else
+                                <span class="text-muted" style="font-size: 0.75rem;">Tidak aktif</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if ($item->condition == 'baik')
+                                <span class="badge badge-success">Baik</span>
+                            @elseif($item->condition == 'rusak')
+                                <span class="badge badge-danger">Rusak</span>
+                            @elseif($item->condition == 'perbaikan')
+                                <span class="badge badge-warning">Perbaikan</span>
+                            @else
+                                <span class="badge badge-primary">Dimusnahkan</span>
+                            @endif
+                        </td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+                                <!-- Quick QR Download -->
+                                <a href="{{ route('items.quick_qr', $item->id) }}" class="btn btn-ghost btn-sm"
+                                    title="Download QR">
+                                    <svg class="icon icon-sm">
+                                        <use href="#icon-qr"></use>
+                                    </svg>
+                                </a>
+
+                                <!-- Wrench Icon: Register for Service -->
+                                @if (auth()->user()->hasPermission('access_services') &&
+                                        $item->condition != 'dimusnahkan' &&
+                                        $item->condition != 'perbaikan')
+                                    <a href="{{ route('items.service.create', $item->id) }}" wire:navigate
+                                        class="btn btn-ghost btn-sm" title="Daftarkan Servis">
+                                        <svg class="icon icon-sm" style="color: var(--color-warning);">
+                                            <use href="#icon-tool"></use>
+                                        </svg>
+                                    </a>
+                                @endif
+
+                                <a href="{{ route('items.edit', $item->id) }}" wire:navigate class="btn btn-ghost btn-sm"
+                                    title="Edit">
+                                    <svg class="icon icon-sm">
+                                        <use href="#icon-edit"></use>
+                                    </svg>
+                                </a>
+
+                                @if (auth()->user()->hasPermission('access_items'))
+                                    <form action="{{ route('items.destroy', $item->id) }}" method="POST"
+                                        style="display: inline;"
+                                        onsubmit="return confirm('Hapus barang ini secara permanen?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-ghost btn-sm"
+                                            style="color: var(--color-danger);" title="Hapus">
+                                            <svg class="icon icon-sm">
+                                                <use href="#icon-trash"></use>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="text-muted">Tidak ada barang ditemukan.</div>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-3">
+        {{ $items->links('vendor.pagination.custom') }}
+    </div>
+
     <script>
         function cleanEmptyFields(form) {
-            const elements = form.elements;
-            for (let i = 0; i < elements.length; i++) {
-                const el = elements[i];
-                if (el.name && !el.value && el.name !== 'pagination' && el.tagName !== 'BUTTON') {
-                    el.name = '';
+            const inputs = form.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                if (!input.value) {
+                    input.name = '';
                 }
-            }
+            });
         }
     </script>
 @endsection

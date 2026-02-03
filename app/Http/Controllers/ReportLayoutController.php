@@ -45,13 +45,10 @@ class ReportLayoutController extends Controller
     public function save(Request $request, $type)
     {
         $columns = json_decode($request->input('columns', '[]'), true);
-        $css = $request->input('css');
-
         ReportLayout::updateOrCreate(
             ['report_type' => $type],
             [
-                'columns' => json_encode($columns),
-                'css' => $css
+                'columns' => json_encode($columns)
             ]
         );
 

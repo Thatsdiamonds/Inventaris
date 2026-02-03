@@ -43,14 +43,46 @@ class Item extends Model
         return \Carbon\Carbon::parse($baseDate)->startOfDay()->addDays($this->service_interval_days);
     }
 
+    public function getServiceStatusAttribute()
+    {
+        if (!$this->service_required) {
+            return 'tidak_perlu';
+        }
+
+        if ($this->condition === 'perbaikan') {
+            return 'sedang_servis';
+        }
+
+        $nextService = $this->next_service_date;
+        if (!$nextService) {
+            return 'menunggu';
+        }
+
+        $today = now()->startOfDay();
+        $nextService = $nextService->startOfDay();
+
+        if ($today->gt($nextService)) {
+            return 'kelewatan';
+        }
+
+        if ($today->eq($nextService)) {
+            return 'jatuh_tempo';
+        }
+
+        return 'akan_datang';
+    }
+
     public function getServiceStatusLabelAttribute()
     {
         if (!$this->service_required) {
             return 'Tidak Perlu';
         }
 
-        $nextService = $this->next_service_date;
+        if ($this->condition === 'perbaikan') {
+            return 'Sedang Servis (Dipause)';
+        }
 
+        $nextService = $this->next_service_date;
         if (!$nextService) {
             return 'Menunggu Data';
         }
@@ -64,11 +96,11 @@ class Item extends Model
         }
 
         $days = $today->diffInDays($nextService);
-        
+
         if ($days == 0) {
             return "Jatuh Tempo Hari Ini";
         }
-        
+
         return "Akan Datang ($days Hari lagi)";
     }
 

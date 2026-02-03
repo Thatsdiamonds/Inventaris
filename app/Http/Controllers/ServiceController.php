@@ -80,11 +80,12 @@ class ServiceController extends Controller
 
         $inServiceQuery = Service::with(['item.category', 'item.location'])->whereNull('date_out');
         $applyServiceFilters($inServiceQuery);
-        $inService = $inServiceQuery->orderBy('date_in', 'desc')->get();
+        $inService = $inServiceQuery->orderBy('date_in', 'desc')->paginate(10, ['*'], 'in_service_page')->withQueryString();
 
         $needsServiceQuery = Item::with(['category', 'location'])
             ->where('is_active', true)
             ->where('service_required', true)
+            ->where('condition', '!=', 'perbaikan')
             ->whereNotNull('service_interval_days')
             ->where(function ($q) use ($today) {
                 $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
@@ -94,11 +95,12 @@ class ServiceController extends Controller
                 $q->whereNull('date_out');
             });
         $applyItemFilters($needsServiceQuery);
-        $needsService = $needsServiceQuery->get();
+        $needsService = $needsServiceQuery->paginate(10, ['*'], 'needs_page')->withQueryString();
 
         $upcomingQuery = Item::with(['category', 'location'])
             ->where('is_active', true)
             ->where('service_required', true)
+            ->where('condition', '!=', 'perbaikan')
             ->whereNotNull('service_interval_days')
             ->whereDoesntHave('services', function ($q) {
                 $q->whereNull('date_out');
@@ -117,21 +119,22 @@ class ServiceController extends Controller
         });
         
         $applyItemFilters($upcomingQuery);
-        $upcoming = $upcomingQuery->get();
+        $upcoming = $upcomingQuery->paginate(10, ['*'], 'upcoming_page')->withQueryString();
 
-        $completedQuery = Service::with(['item.category', 'item.location'])->whereNotNull('date_out');
-        $applyServiceFilters($completedQuery);
-        $completed = $completedQuery->orderBy('date_out', 'desc')->paginate(10, ['*'], 'completed_page')->withQueryString();
+        $status = $request->input('status');
 
-        $allItemsQuery = Item::with(['category', 'location'])
-            ->where('is_active', true)
-            ->where('service_required', true)
-            ->where(function($q) use ($today) {
-                $q->whereHas('services', function($sq) { $sq->whereNull('date_out'); })
-                ->orWhereNotNull('service_interval_days');
-            });
-        $applyItemFilters($allItemsQuery);
-        $allItems = $allItemsQuery->orderBy('name')->paginate(20, ['*'], 'all_page')->withQueryString();
+        $allServicesQuery = Service::with(['item.category', 'item.location']);
+        $applyServiceFilters($allServicesQuery);
+        
+        if ($status === 'completed') {
+            $allServicesQuery->whereNotNull('date_out');
+        } elseif ($status === 'in_progress') {
+            $allServicesQuery->whereNull('date_out');
+        }
+
+        $allServices = $allServicesQuery->orderBy('date_in', 'desc')
+            ->paginate(20, ['*'], 'all_page')
+            ->withQueryString();
 
         $counts = [
             'in_service' => Service::whereNull('date_out')
@@ -164,8 +167,8 @@ class ServiceController extends Controller
         ];
 
         return view('services.index', compact(
-            'inService', 'needsService', 'upcoming', 'completed', 'allItems',
-            'tab', 'counts', 'categories', 'locations'
+            'inService', 'needsService', 'upcoming', 'allServices',
+            'tab', 'counts', 'categories', 'locations', 'status'
         ));
     }
 
@@ -211,6 +214,11 @@ class ServiceController extends Controller
         $item->update($updateData);
 
         return redirect()->route('services.index')->with('success', 'Pencatatan servis dimulai. Barang dialihkan ke status "Perbaikan".');
+    }
+
+    public function finishForm(Service $service)
+    {
+        return view('services.finish', compact('service'));
     }
 
     public function finish(Request $request, Service $service)

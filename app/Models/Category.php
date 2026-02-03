@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasCache;
 use Illuminate\Database\Eloquent\Model;
 
 class Category extends Model
 {
+    use HasCache;
+
     protected $fillable = [
         'name',
         'unique_code',
