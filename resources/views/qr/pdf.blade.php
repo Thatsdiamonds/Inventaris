@@ -4,59 +4,86 @@
 <head>
     <style>
         @page {
-            margin: 10mm;
+            margin: 5mm;
+            size: A4;
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Helvetica', 'Arial', sans-serif;
             margin: 0;
             padding: 0;
+            background: #fff;
         }
 
         .label-container {
             display: inline-block;
-            margin: 2mm;
+            margin: 1.5mm;
             page-break-inside: avoid;
+            vertical-align: top;
         }
 
         .label-card {
-            border: 0.5px solid #000;
-            padding: 3mm;
-            display: table;
-            width: 80mm;
-            height: 40mm;
+            border: 0.2mm solid #000;
+            display: block;
+            width: 100mm;
+            height: 30mm;
             overflow: hidden;
             box-sizing: border-box;
+            position: relative;
         }
 
         .left-section {
-            display: table-cell;
-            vertical-align: middle;
-            padding-right: 3mm;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 70mm;
+            height: 30mm;
+            padding: 2mm 3mm;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .right-section {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: right;
+            position: absolute;
+            right: 0;
+            top: 0;
             width: 30mm;
+            height: 30mm;
+            border-left: 0.1mm solid #000;
+            box-sizing: border-box;
         }
 
         .info-row {
-            margin-bottom: 1mm;
-            font-size: 9pt;
+            margin-bottom: 0.5mm;
+            font-size: 7pt;
+            font-weight: bold;
+            line-height: 1.1;
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
         }
 
         .church-name {
             font-weight: bold;
-            font-size: 11pt;
-            margin-bottom: 2mm;
+            font-size: 8.5pt;
+            margin-bottom: 1.5mm;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            border-bottom: 0.1mm solid #eee;
+            padding-bottom: 0.5mm;
         }
 
         .qr-img {
-            width: 30mm;
-            height: 30mm;
+            width: 29.8mm;
+            height: 29.8mm;
+            display: block;
+        }
+
+        .caps {
+            text-transform: uppercase;
         }
 
         /* Custom CSS from database */
@@ -79,15 +106,15 @@
                             @if ($col == 'church_name')
                                 <div class="church-name">{{ $appName }}</div>
                             @elseif($col == 'location.name')
-                                <div class="info-row"><span class="label">Ruang</span> :
-                                    {{ $item->location->name ?? '-' }}</div>
+                                <div class="info-row">LOKASI : <span
+                                        class="caps">{{ $item->location->name ?? '-' }}</span></div>
                             @elseif($col == 'uqcode')
-                                <div class="info-row"><span class="label">Kode Barang</span> : {{ $item->uqcode }}</div>
+                                <div class="info-row">KODE : {{ $item->uqcode }}</div>
                             @elseif($col == 'created_at')
-                                <div class="info-row"><span class="label">Tahun Inventaris</span> :
+                                <div class="info-row">INV :
                                     {{ $item->created_at ? $item->created_at->format('Y') : '-' }}</div>
                             @elseif($col == 'acquisition_date')
-                                <div class="info-row"><span class="label">Tahun Perolehan</span> :
+                                <div class="info-row">BELI :
                                     {{ $item->acquisition_date ? $item->acquisition_date->format('Y') : '-' }}</div>
                             @endif
                         </div>

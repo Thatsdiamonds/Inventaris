@@ -102,7 +102,7 @@
                             Output</label>
                         <select name="format"
                             style="font-size: 0.875rem; background: white; padding: 4px 10px; border-radius: 6px;">
-                            <option value="pdf">PDF (Siap Cetak)</option>
+                            <option value="html_print">Cetak (Tampilan Cetak)</option>
                             <option value="zip">ZIP (Kumpulan Gambar)</option>
                         </select>
                     </div>

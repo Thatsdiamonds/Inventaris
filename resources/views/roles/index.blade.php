@@ -87,4 +87,49 @@
         </table>
         {{ $roles->links('vendor.pagination.custom') }}
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedPerPage = localStorage.getItem('roles_per_page');
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentPerPage = urlParams.get('per_page');
+
+            const container = document.querySelector('.table-container');
+            if (container) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex-between mt-2 text-muted text-xs';
+                wrapper.style.justifyContent = 'flex-end';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '10px';
+                wrapper.style.padding = '10px';
+
+                wrapper.innerHTML = `
+                    <span>Tampilkan: </span>
+                    <select id="per_page_select" style="border: 1px solid var(--color-border); padding: 2px 5px; border-radius: 4px; font-size: 0.8rem;">
+                        <option value="15">15</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                `;
+
+                container.appendChild(wrapper);
+
+                const select = document.getElementById('per_page_select');
+                if (currentPerPage) {
+                    select.value = currentPerPage;
+                } else if (savedPerPage) {
+                    select.value = savedPerPage;
+                }
+
+                select.addEventListener('change', function() {
+                    const val = this.value;
+                    localStorage.setItem('roles_per_page', val);
+                    const url = new URL(window.location);
+                    url.searchParams.set('per_page', val);
+                    window.location.href = url.toString();
+                });
+            }
+        });
+    </script>
 @endsection

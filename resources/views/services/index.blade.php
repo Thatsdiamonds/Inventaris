@@ -7,7 +7,7 @@
     </div>
 
     <!-- Tabs Section -->
-    <div class="tabs">
+    <div class="tabs" style="color: black !important">
         <a href="{{ route('services.index', ['tab' => 'in_service']) }}" wire:navigate
             class="tab {{ $tab == 'in_service' ? 'active' : '' }}">
             Sedang Diservis
@@ -16,14 +16,12 @@
         <a href="{{ route('services.index', ['tab' => 'needs_service']) }}" wire:navigate
             class="tab {{ $tab == 'needs_service' ? 'active' : '' }}">
             Perlu Servis
-            <span class="tab-badge badge-warning"
-                style="background: var(--color-warning); color: white;">{{ $counts['needs_service'] }}</span>
+            <span class="tab-badge badge-warning">{{ $counts['needs_service'] }}</span>
         </a>
         <a href="{{ route('services.index', ['tab' => 'upcoming']) }}" wire:navigate
             class="tab {{ $tab == 'upcoming' ? 'active' : '' }}">
             Akan Datang
-            <span class="tab-badge badge-info"
-                style="background: var(--color-info); color: white;">{{ $counts['upcoming'] }}</span>
+            <span class="tab-badge badge-info">{{ $counts['upcoming'] }}</span>
         </a>
         <a href="{{ route('services.index', ['tab' => 'all']) }}" wire:navigate
             class="tab {{ $tab == 'all' ? 'active' : '' }}">
@@ -47,6 +45,21 @@
                     </svg>
                 </div>
             </div>
+
+            @if ($tab == 'upcoming')
+                <div>
+                    <label>Jangka Waktu</label>
+                    <select name="upcoming_filter" onchange="this.form.submit()">
+                        <option value="1_week" {{ request('upcoming_filter') == '1_week' ? 'selected' : '' }}>1 Minggu
+                        </option>
+                        <option value="30_days" {{ request('upcoming_filter', '30_days') == '30_days' ? 'selected' : '' }}>
+                            30 Hari</option>
+                        <option value="2_months" {{ request('upcoming_filter') == '2_months' ? 'selected' : '' }}>2 Bulan
+                        </option>
+                        <option value="all" {{ request('upcoming_filter') == 'all' ? 'selected' : '' }}>Semua</option>
+                    </select>
+                </div>
+            @endif
 
             @if ($tab == 'all')
                 <div>
@@ -82,12 +95,24 @@
                 </select>
             </div>
 
-            <div style="display: flex; gap: 0.5rem;">
+            <div>
+                <label>Tampilkan</label>
+                <select name="per_page" onchange="this.form.submit()">
+                    <option value="10" {{ request('per_page') == 10 ? 'selected' : '' }}>10 Baris</option>
+                    <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25 Baris</option>
+                    <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50 Baris</option>
+                    <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100 Baris</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
                 <button type="submit" class="btn btn-accent btn-sm" style="flex: 1;">Filter</button>
                 <a href="{{ route('services.index', ['tab' => $tab]) }}" wire:navigate class="btn btn-ghost btn-sm"
-                    style="padding: 0 0.75rem;"><svg class="icon icon-sm">
+                    style="padding: 0 0.75rem;" title="Reset Filter">
+                    <svg class="icon icon-sm">
                         <use href="#icon-refresh"></use>
-                    </svg></a>
+                    </svg>
+                </a>
             </div>
         </form>
     </div>

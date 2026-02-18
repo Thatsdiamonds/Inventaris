@@ -54,7 +54,8 @@
 
     <div>
         <label>Name:</label>
-        <input type="text" name="name" value="{{ $item->name }}" required>
+        <input type="text" id="edit_item_name" name="name" value="{{ $item->name }}" required
+            oninput="debounceEditPreview()">
     </div>
 
     <div style="margin-top: 10px;">
@@ -94,21 +95,32 @@
 </form>
 
 <script>
+    let editPreviewTimeout;
+
+    function debounceEditPreview() {
+        clearTimeout(editPreviewTimeout);
+        editPreviewTimeout = setTimeout(updateEditPreview, 500);
+    }
+
     async function updateEditPreview() {
         const locSelect = document.getElementById('edit_location_id');
         const catSelect = document.getElementById('edit_category_id');
         const dateInput = document.getElementById('edit_acquisition_date');
+        const nameInput = document.getElementById('edit_item_name');
         const preview = document.getElementById('edit_uqcode_preview');
 
         const locId = locSelect.value;
         const catId = catSelect.value;
         const date = dateInput.value;
+        const name = nameInput.value;
 
         const originalLocId = "{{ $item->location_id }}";
         const originalCatId = "{{ $item->category_id }}";
+        const originalName = "{{ $item->name }}";
         const originalUqcode = "{{ $item->uqcode }}";
 
-        if (locId == originalLocId && catId == originalCatId) {
+        // Logic check: if nothing critical changed, keep original UQ Code
+        if (locId == originalLocId && catId == originalCatId && name === originalName) {
             preview.value = originalUqcode;
             return;
         }
@@ -121,9 +133,10 @@
 
         try {
             const response = await fetch(
-                `{{ route('api.items.next-serial') }}?location_id=${locId}&category_id=${catId}`);
+                `{{ route('api.items.next-serial') }}?location_id=${locId}&category_id=${catId}&name=${encodeURIComponent(name)}`
+            );
             const data = await response.json();
-            preview.value = `${locCode}.${catCode}.${data.serial}.${year}`;
+            preview.value = `${locCode}.${catCode}.${data.name_code}.${data.serial}.${year}`;
         } catch (error) {
             preview.value = "Error";
         }

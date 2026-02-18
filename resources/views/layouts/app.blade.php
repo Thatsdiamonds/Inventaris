@@ -18,49 +18,36 @@
     @livewireStyles
 
     <style>
+        /* Dynamic Layout Variables */
         :root {
             --sidebar-width: 260px;
         }
 
         .app-wrapper {
             min-height: 100vh;
-            background: var(--color-bg-secondary);
+            background: var(--c-bg-app);
+            display: flex;
         }
 
         .main-container {
+            flex: 1;
             margin-left: var(--sidebar-width);
-            padding: var(--spacing-lg);
-            box-sizing: border-box;
-            overflow-x: hidden;
-            animation: fadeIn 0.3s ease;
+            padding: 2rem;
             min-height: 100vh;
-            transition: margin-left 0.05s linear;
+            transition: margin-left 0.1s ease-out;
+            width: calc(100% - var(--sidebar-width));
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        /* Page Loader Styles */
+        /* Page Loader */
         #page-loader {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.15);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            inset: 0;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(2px);
             z-index: 9999;
             display: none;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s;
             pointer-events: none;
         }
 
@@ -74,28 +61,45 @@
             position: fixed;
             top: 0;
             left: 0;
-            height: 3px;
+            height: 2px;
             width: 0;
-            background: var(--color-accent);
-            box-shadow: 0 0 10px var(--color-accent);
+            background: var(--c-accent);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
             z-index: 10000;
-            transition: width 0.4s ease;
+            transition: width 0.3s ease-out;
         }
     </style>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const resizer = document.getElementById('sidebarResizer');
+        function initSidebar() {
             const root = document.documentElement;
-            const sidebar = document.querySelector('.sidebar');
+            const sidebarNav = document.querySelector('.sidebar-nav');
+            const resizer = document.getElementById('sidebarResizer');
 
-            // Load saved width
+            // 1. Restore Sidebar Width
             const savedWidth = localStorage.getItem('sidebar-width');
             if (savedWidth) {
                 root.style.setProperty('--sidebar-width', savedWidth + 'px');
             }
 
-            if (resizer) {
+            // 2. Restore Scroll Position
+            if (sidebarNav) {
+                const scrollPos = localStorage.getItem('sidebar-scroll');
+                if (scrollPos) {
+                    sidebarNav.scrollTop = parseInt(scrollPos);
+                }
+
+                // Add listener if not already attached
+                if (!sidebarNav.dataset.hasScrollListener) {
+                    sidebarNav.addEventListener('scroll', () => {
+                        localStorage.setItem('sidebar-scroll', sidebarNav.scrollTop);
+                    });
+                    sidebarNav.dataset.hasScrollListener = 'true';
+                }
+            }
+
+            // 3. Init Resizer (if exists and not initialized)
+            if (resizer && !resizer.dataset.hasResizerListener) {
                 let isResizing = false;
 
                 resizer.addEventListener('mousedown', (e) => {
@@ -106,13 +110,9 @@
 
                 document.addEventListener('mousemove', (e) => {
                     if (!isResizing) return;
-
                     let newWidth = e.clientX;
-
-                    // Min and Max constraints
                     if (newWidth < 200) newWidth = 200;
                     if (newWidth > 450) newWidth = 450;
-
                     root.style.setProperty('--sidebar-width', newWidth + 'px');
                 });
 
@@ -121,17 +121,21 @@
                         isResizing = false;
                         document.body.style.cursor = 'default';
                         document.body.style.userSelect = 'auto';
-
-                        // Save width
-                        const currentWidth = getComputedStyle(root).getPropertyValue('--sidebar-width')
-                            .replace('px', '').trim();
+                        const currentWidth = getComputedStyle(root).getPropertyValue('--sidebar-width').replace(
+                            'px', '').trim();
                         localStorage.setItem('sidebar-width', currentWidth);
                     }
                 });
+
+                resizer.dataset.hasResizerListener = 'true';
             }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSidebar();
         });
 
-        // Livewire Navigation Events for Loader
+        // Livewire Navigation Events
         document.addEventListener('livewire:navigating', () => {
             const loader = document.getElementById('page-loader');
             const progress = document.querySelector('.loader-progress');
@@ -148,6 +152,9 @@
                 if (loader) loader.classList.remove('active');
                 if (progress) progress.style.width = '0%';
             }, 300);
+
+            // Re-init sidebar on navigation end
+            initSidebar();
         });
     </script>
 </head>

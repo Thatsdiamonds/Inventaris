@@ -70,7 +70,7 @@ class QrController extends Controller
         $request->validate([
             'item_ids' => 'required|array',
             'item_ids.*' => 'exists:items,id',
-            'format' => 'nullable|string|in:pdf,zip,img',
+            'format' => 'nullable|string|in:pdf,zip,img,html_print',
         ]);
 
         // Smart Redirect: If it's a GET request for a single image, download directly
@@ -83,7 +83,7 @@ class QrController extends Controller
             'title' => 'Menyiapkan Label QR',
             'message' => 'File label sedang diproses untuk ' . count($request->item_ids) . ' barang.',
             'downloadUrl' => route('qr.download_file'),
-            'redirectUrl' => route('qr.index'),
+            'redirectUrl' => $request->input('redirect_url', route('items.index')),
             'method' => 'POST',
             'params' => $request->all()
         ]);
@@ -94,7 +94,7 @@ class QrController extends Controller
         $request->validate([
             'item_ids' => 'required|array',
             'item_ids.*' => 'exists:items,id',
-            'format' => 'nullable|string|in:pdf,zip,img',
+            'format' => 'nullable|string|in:pdf,zip,img,html_print',
         ]);
 
         $itemIds = $request->input('item_ids');
@@ -140,7 +140,39 @@ class QrController extends Controller
             $response = response($imgContent)
                 ->header('Content-Type', 'image/jpeg')
                 ->header('Content-Disposition', 'attachment; filename="' . $item->uqcode . '.jpg"');
+
+        } elseif ($format === 'html_print') {
+             $qrCodes = [];
+            foreach ($items as $item) {
+                $qrContent = sprintf(
+                    "Kode: %s\nNama: %s\nLokasi: %s\nKategori: %s",
+                    $item->uqcode,
+                    $item->name,
+                    $item->location->name ?? '-',
+                    $item->category->name ?? '-'
+                );
+
+                $qrCode = new QrCode(
+                    data: $qrContent,
+                    encoding: new Encoding('UTF-8'),
+                    errorCorrectionLevel: ErrorCorrectionLevel::High,
+                    size: 200,
+                    margin: 0
+                );
+
+                $result = $writer->write($qrCode);
+                $qrCodes[$item->id] = base64_encode($result->getString());
+            }
+
+            return view('qr.print', [
+                'items' => $items,
+                'qrCodes' => $qrCodes,
+                'appName' => $appName,
+                'columns' => $columns,
+                'customCss' => $customCss
+            ]);
         } else {
+            // Default or PDF Fallback (if we still supported it)
             // PDF Logic
             $qrCodes = [];
             foreach ($items as $item) {

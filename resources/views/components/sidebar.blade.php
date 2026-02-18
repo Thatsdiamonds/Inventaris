@@ -6,24 +6,23 @@
         $appName = $setting->nama_gereja ?? 'Inventaris';
     @endphp
 
-    <div class="sidebar-brand-wrapper">
+    <div class="sidebar-header">
         @if ($setting && $setting->church_photo_path)
-            <div class="sidebar-photo">
-                <img src="{{ asset('storage/' . $setting->church_photo_path) }}" alt="{{ $appName }}" loading="lazy">
+            <div class="sidebar-logo">
+                <img src="{{ asset('storage/' . $setting->church_photo_path) }}" alt="{{ $appName }}">
             </div>
         @endif
         <div class="sidebar-brand {{ !($setting && $setting->church_photo_path) ? 'no-photo' : '' }}">
-            <h2 class="brand-title">{{ substr($appName, 0, 25) }}</h2>
+            <h2 class="brand-text">{{ substr($appName, 0, 25) }}</h2>
         </div>
     </div>
 
     <nav class="sidebar-nav">
         <ul class="nav-list">
-            <li class="nav-section-title">Menu Utama</li>
+            <li class="nav-section">NAVIGASI</li>
             <li class="nav-item">
-                <a href="{{ url('/') }}" wire:navigate class="nav-link {{ request()->is('/') ? 'active' : '' }}"
-                    title="Dashboard">
-                    <svg class="icon">
+                <a href="{{ url('/') }}" wire:navigate class="nav-link {{ request()->is('/') ? 'active' : '' }}">
+                    <svg class="icon icon-sm">
                         <use href="#icon-dashboard"></use>
                     </svg>
                     <span>Dashboard</span>
@@ -33,11 +32,11 @@
             @if (auth()->user()->hasPermission('access_items'))
                 <li class="nav-item">
                     <a href="{{ route('items.index') }}" wire:navigate
-                        class="nav-link {{ request()->is('items*') ? 'active' : '' }}" title="Daftar Barang">
-                        <svg class="icon">
+                        class="nav-link {{ request()->is('items*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
                             <use href="#icon-box"></use>
                         </svg>
-                        <span>Daftar Barang</span>
+                        <span>Aset & Barang</span>
                     </a>
                 </li>
             @endif
@@ -45,11 +44,11 @@
             @if (auth()->user()->hasPermission('access_services'))
                 <li class="nav-item">
                     <a href="{{ route('services.index') }}" wire:navigate
-                        class="nav-link {{ request()->is('services*') ? 'active' : '' }}" title="Manajemen Servis">
-                        <svg class="icon">
+                        class="nav-link {{ request()->is('services*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
                             <use href="#icon-tool"></use>
                         </svg>
-                        <span>Manajemen Servis</span>
+                        <span>Servis & Pemeliharaan</span>
                     </a>
                 </li>
             @endif
@@ -57,24 +56,36 @@
             @if (auth()->user()->hasPermission('access_items'))
                 <li class="nav-item">
                     <a href="{{ route('qr.index') }}" wire:navigate
-                        class="nav-link {{ request()->is('qr*') ? 'active' : '' }}" title="Cetak QR Code">
-                        <svg class="icon">
+                        class="nav-link {{ request()->is('qr*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
                             <use href="#icon-qr"></use>
                         </svg>
-                        <span>Cetak QR Code</span>
+                        <span>Cetak Label QR</span>
                     </a>
                 </li>
             @endif
 
-            <li class="nav-section-title">Data Master</li>
+            <li class="nav-section">MASTER DATA</li>
+            @if (auth()->user()->hasPermission('access_items'))
+                <li class="nav-item">
+                    <a href="{{ route('item-types.index') }}" wire:navigate
+                        class="nav-link {{ request()->is('item-types*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
+                            <use href="#icon-tag"></use>
+                        </svg>
+                        <span>Katalog Nama Barang</span>
+                    </a>
+                </li>
+            @endif
+
             @if (auth()->user()->hasPermission('access_categories'))
                 <li class="nav-item">
                     <a href="{{ route('categories.index') }}" wire:navigate
-                        class="nav-link {{ request()->is('categories*') ? 'active' : '' }}" title="Kategori Barang">
-                        <svg class="icon">
+                        class="nav-link {{ request()->is('categories*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
                             <use href="#icon-tag"></use>
                         </svg>
-                        <span>Kategori Barang</span>
+                        <span>Kategori Aset</span>
                     </a>
                 </li>
             @endif
@@ -82,11 +93,11 @@
             @if (auth()->user()->hasPermission('access_locations'))
                 <li class="nav-item">
                     <a href="{{ route('locations.index') }}" wire:navigate
-                        class="nav-link {{ request()->is('locations*') ? 'active' : '' }}" title="Lokasi Inventaris">
-                        <svg class="icon">
+                        class="nav-link {{ request()->is('locations*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
                             <use href="#icon-location"></use>
                         </svg>
-                        <span>Lokasi Inventaris</span>
+                        <span>Lokasi & Ruangan</span>
                     </a>
                 </li>
             @endif
@@ -94,86 +105,76 @@
             @if (auth()->user()->hasPermission('access_reports'))
                 <li class="nav-item">
                     <a href="{{ route('reports.menu') }}" wire:navigate
-                        class="nav-link {{ request()->is('reports*') ? 'active' : '' }}" title="Laporan Aset">
-                        <svg class="icon">
+                        class="nav-link {{ request()->is('reports*') ? 'active' : '' }}">
+                        <svg class="icon icon-sm">
                             <use href="#icon-report"></use>
                         </svg>
-                        <span>Laporan Aset</span>
+                        <span>Laporan Lengkap</span>
                     </a>
                 </li>
             @endif
 
             @if (auth()->user()->hasPermission('access_users') || auth()->user()->hasPermission('access_settings'))
-                <li class="nav-section-title">Sistem</li>
-                <li class="nav-item dropdown-toggle">
-                    <div class="nav-link dropdown-trigger {{ request()->is('users*', 'roles*', 'settings*') ? 'active' : '' }}"
-                        onclick="this.parentElement.classList.toggle('open')">
-                        <svg class="icon">
-                            <use href="#icon-settings"></use>
-                        </svg>
-                        <span>Manajemen Sistem</span>
-                        <svg class="icon-sm arrow">
-                            <use href="#icon-chevron-down"></use>
-                        </svg>
-                    </div>
-                    <ul class="dropdown-menu">
-                        @if (auth()->user()->hasPermission('access_users'))
-                            <li>
-                                <a href="{{ route('users.index') }}" wire:navigate
-                                    class="{{ request()->is('users*') ? 'active' : '' }}">
-                                    Kelola Pengguna
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('roles.index') }}" wire:navigate
-                                    class="{{ request()->is('roles*') ? 'active' : '' }}">
-                                    Peran & Izin
-                                </a>
-                            </li>
-                        @endif
-                        @if (auth()->user()->hasPermission('access_settings'))
-                            <li>
-                                <a href="{{ route('settings.index') }}" wire:navigate
-                                    class="{{ request()->is('settings*') ? 'active' : '' }}">
-                                    Pengaturan Dasar
-                                </a>
-                            </li>
-                        @endif
-                    </ul>
-                </li>
+                <li class="nav-section">SISTEM</li>
+
+                @if (auth()->user()->hasPermission('access_users'))
+                    <li class="nav-item">
+                        <a href="{{ route('users.index') }}" wire:navigate
+                            class="nav-link {{ request()->is('users*') ? 'active' : '' }}">
+                            <svg class="icon icon-sm">
+                                <use href="#icon-users"></use>
+                            </svg>
+                            <span>Pengguna</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('roles.index') }}" wire:navigate
+                            class="nav-link {{ request()->is('roles*') ? 'active' : '' }}">
+                            <svg class="icon icon-sm">
+                                <use href="#icon-shield"></use>
+                            </svg>
+                            <span>Peran & Izin</span>
+                        </a>
+                    </li>
+                @endif
+
+                @if (auth()->user()->hasPermission('access_settings'))
+                    <li class="nav-item">
+                        <a href="{{ route('settings.index') }}" wire:navigate
+                            class="nav-link {{ request()->is('settings*') ? 'active' : '' }}">
+                            <svg class="icon icon-sm">
+                                <use href="#icon-settings"></use>
+                            </svg>
+                            <span>Pengaturan</span>
+                        </a>
+                    </li>
+                @endif
             @endif
         </ul>
     </nav>
 
     <div class="sidebar-footer">
-        <div class="user-info mb-2 px-2 py-1 flex items-center gap-3">
-            <div class="user-avatar">
-                <svg class="icon-md">
-                    <use href="#icon-user"></use>
-                </svg>
+        <div class="user-profile">
+            <div class="avatar">
+                {{ substr(auth()->user()->name, 0, 1) }}
             </div>
-            <div class="user-details overflow-hidden">
-                <div class="user-name">{{ auth()->user()->name }}</div>
-                <div class="user-role">{{ auth()->user()->assignedRole->name ?? 'User' }}</div>
+            <div class="user-info">
+                <div class="name">{{ auth()->user()->name }}</div>
+                <div class="role">{{ auth()->user()->assignedRole->name ?? 'Staff' }}</div>
             </div>
         </div>
-
-        <div class="footer-actions flex gap-1">
-            <a href="{{ route('profile.show') }}" wire:navigate class="nav-link flex-1" title="Profil"
-                style="justify-content: center; padding: 8px;">
-                <svg class="icon-sm">
+        <div class="footer-actions">
+            <a href="{{ route('profile.show') }}" title="Profil Saya" class="action-btn">
+                <svg class="icon icon-sm">
                     <use href="#icon-user"></use>
                 </svg>
-                <span class="ml-1" style="font-size: 0.75rem;">Profil</span>
             </a>
-            <form action="{{ route('logout') }}" method="POST" class="flex-1">
+            <form action="{{ route('logout') }}" method="POST" class="inline-block">
                 @csrf
-                <button type="submit" class="nav-link logout-btn w-full" title="Keluar"
-                    style="justify-content: center; padding: 8px; border: none; background: transparent; cursor: pointer;">
-                    <svg class="icon-sm">
+                <button type="submit" title="Keluar" class="action-btn text-danger">
+                    <svg class="icon icon-sm">
                         <use href="#icon-logout"></use>
                     </svg>
-                    <span class="ml-1" style="font-size: 0.75rem;">Keluar</span>
                 </button>
             </form>
         </div>
@@ -189,244 +190,186 @@
         top: 0;
         bottom: 0;
         width: var(--sidebar-width, 260px);
-        background: #fbfcfd;
-        border-right: 1px solid var(--color-border-light);
+        background: var(--c-bg-card);
+        border-right: 1px solid var(--c-border);
         display: flex;
         flex-direction: column;
-        z-index: 100;
-        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.03);
-        transition: width 0.05s linear;
-        user-select: none;
+        z-index: 50;
+        transition: width 0.1s ease-out;
     }
 
-    .sidebar-brand-wrapper {
-        border-bottom: 1px solid var(--color-border-light);
-        flex-shrink: 0;
+    .sidebar-header {
+        padding: 1.5rem 1.5rem 1rem;
+        border-bottom: 1px solid var(--c-border);
     }
 
-    .sidebar-photo {
-        width: 100%;
-        height: 100px;
-        overflow: hidden;
+    .sidebar-logo img {
+        height: 40px;
+        object-fit: contain;
+        margin-bottom: 0.5rem;
     }
 
-    .sidebar-photo img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .sidebar-brand {
-        padding: var(--spacing-md) var(--spacing-lg);
-    }
-
-    .sidebar-brand.no-photo {
-        padding: var(--spacing-lg);
-    }
-
-    .brand-title {
-        font-size: 0.95rem;
+    .brand-text {
+        font-size: 1rem;
         font-weight: 700;
-        color: var(--color-primary);
+        color: var(--c-primary);
         margin: 0;
-        letter-spacing: -0.2px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        text-align: center;
     }
 
     .sidebar-nav {
         flex: 1;
         overflow-y: auto;
-        overflow-x: hidden;
-        padding: var(--spacing-md) 0;
-    }
-
-    /* Dropdown CSS */
-    .dropdown-toggle .dropdown-menu {
-        display: none;
-        list-style: none;
-        padding: 0 0 0 calc(var(--spacing-lg) + 12px);
-        margin: 4px 0;
-    }
-
-    .dropdown-toggle.open .dropdown-menu {
-        display: block;
-    }
-
-    .dropdown-toggle.open .arrow {
-        transform: rotate(180deg);
-    }
-
-    .dropdown-trigger {
-        cursor: pointer;
-    }
-
-    .dropdown-trigger .arrow {
-        margin-left: auto;
-        transition: transform 0.2s;
-    }
-
-    .dropdown-menu li a {
-        display: block;
-        padding: 8px var(--spacing-md);
-        color: var(--color-text-secondary);
-        text-decoration: none;
-        font-size: 0.8rem;
-        border-radius: var(--radius-sm);
-        transition: all 0.2s;
-    }
-
-    .dropdown-menu li a:hover {
-        background: rgba(52, 152, 219, 0.05);
-        color: var(--color-accent);
-    }
-
-    .dropdown-menu li a.active {
-        color: var(--color-accent);
-        font-weight: 600;
+        padding: 1rem 0;
     }
 
     .nav-list {
         list-style: none;
-        padding: 0 var(--spacing-md);
-        margin: 0;
+        padding: 0 1rem;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 0.25rem;
     }
 
-    .nav-item {
-        margin: 0;
+    .nav-section {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--c-text-tertiary);
+        margin: 1.5rem 0 0.5rem 0.75rem;
+        letter-spacing: 0.05em;
+    }
+
+    .nav-section:first-child {
+        margin-top: 0.5rem;
     }
 
     .nav-link {
         display: flex;
         align-items: center;
-        gap: var(--spacing-md);
-        padding: 0.65rem var(--spacing-md);
-        color: var(--color-text);
-        text-decoration: none;
+        gap: 0.75rem;
+        padding: 0.625rem 0.75rem;
+        color: var(--c-text-secondary);
         font-weight: 500;
         font-size: 0.875rem;
-        transition: all var(--transition-fast);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
+        transition: all 0.2s;
+        text-decoration: none;
         white-space: nowrap;
+        overflow: hidden;
     }
 
     .nav-link:hover {
-        background: rgba(52, 152, 219, 0.05);
-        color: var(--color-accent);
-        transform: translateX(4px);
-    }
-
-    .nav-link:active {
-        transform: scale(0.96);
+        background: var(--c-bg-app);
+        color: var(--c-primary);
     }
 
     .nav-link.active {
-        background: var(--color-accent);
-        color: white;
-        font-weight: 600;
-        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+        background: var(--c-accent-subtle);
+        color: var(--c-accent);
     }
 
-    .nav-link.active .icon {
-        color: white;
-    }
-
-    .nav-link .icon {
+    .nav-link svg {
         flex-shrink: 0;
-        width: 18px;
-        height: 18px;
+        opacity: 0.7;
     }
 
-    .nav-section-title {
-        padding: var(--spacing-lg) var(--spacing-md) var(--spacing-xs);
-        font-size: 0.61rem;
-        font-weight: 800;
-        color: var(--color-text-muted);
-        text-transform: uppercase;
-        letter-spacing: 1.5px;
+    .nav-link.active svg {
+        opacity: 1;
     }
 
     .sidebar-footer {
-        padding: var(--spacing-md);
-        border-top: 1px solid var(--color-border-light);
-        flex-shrink: 0;
-        background: #f8f9fa;
-    }
-
-    .user-info {
+        padding: 1rem;
+        border-top: 1px solid var(--c-border);
+        background: var(--c-bg-app);
         display: flex;
         align-items: center;
-        gap: 12px;
+        justify-content: space-between;
     }
 
-    .user-avatar {
+    .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .avatar {
         width: 32px;
         height: 32px;
-        background: var(--color-accent);
+        background: var(--c-primary);
         color: white;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
         flex-shrink: 0;
     }
 
-    .user-name {
-        font-size: 0.85rem;
+    .user-info {
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .user-info .name {
+        font-size: 0.8125rem;
         font-weight: 600;
-        color: var(--color-text);
+        color: var(--c-primary);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
-    .user-role {
+    .user-info .role {
         font-size: 0.7rem;
-        color: var(--color-text-muted);
+        color: var(--c-text-secondary);
     }
 
     .footer-actions {
         display: flex;
-        gap: 8px;
-        margin-top: 8px;
+        gap: 0.25rem;
     }
 
-    .logout-btn {
-        color: var(--color-danger) !important;
+    .action-btn {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-sm);
+        color: var(--c-text-secondary);
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        transition: all 0.2s;
     }
 
-    .logout-btn:hover {
-        background: rgba(231, 76, 60, 0.08) !important;
+    .action-btn:hover {
+        background: rgba(0, 0, 0, 0.05);
+        color: var(--c-primary);
+    }
+
+    .action-btn.text-danger:hover {
+        background: var(--c-danger-bg);
+        color: var(--c-danger);
     }
 
     .sidebar-resizer {
         position: absolute;
-        right: -2px;
+        right: -3px;
         top: 0;
         bottom: 0;
         width: 6px;
         cursor: col-resize;
-        transition: background 0.2s;
-        z-index: 101;
+        z-index: 100;
     }
 
-    .sidebar-resizer:hover,
-    .sidebar-resizer:active {
-        background: var(--color-accent);
-    }
-
-    /* Scrollbar */
-    .sidebar-nav::-webkit-scrollbar {
-        width: 4px;
-    }
-
-    .sidebar-nav::-webkit-scrollbar-thumb {
-        background: var(--color-border);
-        border-radius: 2px;
+    .sidebar-resizer:hover {
+        background: var(--c-accent);
+        opacity: 0.5;
     }
 </style>

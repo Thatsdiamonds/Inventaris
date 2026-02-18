@@ -15,16 +15,6 @@
             background: #f4f7f6;
         }
 
-        .box {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-
         h2 {
             color: #2c3e50;
             margin-top: 0;
@@ -100,7 +90,7 @@
 <body>
     <div class="toast-container" id="toastContainer"></div>
 
-    <div class="box">
+    <div>
         <div class="loader"></div>
         <h2>{{ $title ?? 'Memproses Unduhan' }}</h2>
         <p>{{ $message ?? 'File sedang disiapkan, unduhan akan dimulai otomatis.' }}</p>

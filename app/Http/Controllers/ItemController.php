@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemHistory;
+use App\Models\ItemType;
 use App\Models\Location;
 use App\Services\ImageOptimizationService;
 use Illuminate\Http\Request;
@@ -13,6 +14,15 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
+        // 1. Optimize data retrieval for filters (Cache for 60 minutes)
+        $categories = \Illuminate\Support\Facades\Cache::remember('categories_all', 60 * 60, function () {
+            return Category::all();
+        });
+
+        $locations = \Illuminate\Support\Facades\Cache::remember('locations_all', 60 * 60, function () {
+            return Location::all();
+        });
+
         $query = Item::with(['category', 'location']);
 
         if ($request->filled('is_active')) {
@@ -23,7 +33,7 @@ class ItemController extends Controller
 
         // Location-based Access Check
         $user = auth()->user();
-        if (!$user->isRoot()) {
+        if (! $user->isRoot()) {
             $authorizedLocations = $user->authorizedLocations();
             if ($authorizedLocations->isNotEmpty()) {
                 $query->whereIn('location_id', $authorizedLocations->pluck('id'));
@@ -106,48 +116,78 @@ class ItemController extends Controller
             }
         }
 
-        $categories = Category::all();
-        
-        $locations = Location::all();
-        if (!$user->isRoot()) {
+        // $categories and $locations are already loaded and cached above
+        // Filter locations based on user permissions if needed
+        $displayLocations = $locations;
+        if (! $user->isRoot()) {
             $authLocs = $user->authorizedLocations();
             if ($authLocs->isNotEmpty()) {
-                $locations = $authLocs;
+                $displayLocations = $authLocs;
             }
         }
 
-        return view('items.index', compact('items', 'categories', 'locations', 'enablePagination'));
+        return view('items.index', [
+            'items' => $items,
+            'categories' => $categories,
+            'locations' => $displayLocations,
+            'enablePagination' => $enablePagination,
+        ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        $categories = Category::all();
+        $categories = \Illuminate\Support\Facades\Cache::remember('categories_all', 60 * 60, function () {
+            return Category::all();
+        });
+
         $user = auth()->user();
+        $allLocations = \Illuminate\Support\Facades\Cache::remember('locations_all', 60 * 60, function () {
+            return Location::all();
+        });
+
         $locations = $user->authorizedLocations();
         if ($locations->isEmpty()) {
-            $locations = Location::all();
+            $locations = $allLocations;
         }
 
-        return view('items.create', compact('categories', 'locations'));
+        $preselectedGroup = null;
+        if ($request->filled('group_id')) {
+            $preselectedGroup = ItemType::find($request->group_id);
+        }
+
+        return view('items.create', compact('categories', 'locations', 'preselectedGroup'));
     }
 
-    private function generateUqcode($locationId, $categoryId, $acquisitionDate)
+    private function getNameCode($itemName)
+    {
+        $itemType = \App\Models\ItemType::where('name', $itemName)->first();
+        if ($itemType) {
+            return $itemType->unique_code;
+        }
+
+        return strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $itemName));
+    }
+
+    private function generateUqcode($locationId, $categoryId, $acquisitionDate, $itemName)
     {
         $location = Location::findOrFail($locationId);
         $category = Category::findOrFail($categoryId);
         $year = \Carbon\Carbon::parse($acquisitionDate)->format('Y');
 
-        $count = Item::where('location_id', $locationId)
-            ->where('category_id', $categoryId)
-            ->count() + 1;
+        $nameCode = $this->getNameCode($itemName);
+
+        // Count items with same Location, Category AND Name Code
+        // We use the generated uqcode prefix to find similar items
+        $prefix = sprintf('%s.%s.%s.', $location->unique_code, $category->unique_code, $nameCode);
+        $count = Item::where('uqcode', 'LIKE', $prefix.'%')->count() + 1;
 
         $serial = str_pad($count, 3, '0', STR_PAD_LEFT);
-        $uqcode = sprintf('%s.%s.%s.%s', $location->unique_code, $category->unique_code, $serial, $year);
+        $uqcode = sprintf('%s%s.%s', $prefix, $serial, $year);
 
         while (Item::where('uqcode', $uqcode)->exists()) {
             $count++;
             $serial = str_pad($count, 3, '0', STR_PAD_LEFT);
-            $uqcode = sprintf('%s.%s.%s.%s', $location->unique_code, $category->unique_code, $serial, $year);
+            $uqcode = sprintf('%s%s.%s', $prefix, $serial, $year);
         }
 
         return $uqcode;
@@ -156,25 +196,43 @@ class ItemController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
-            'location_id' => 'required|exists:locations,id',
-            'condition' => 'required|in:baik,rusak,perbaikan,dimusnahkan',
-            'photo' => 'nullable|image',
-            'service_interval_days' => 'nullable|integer',
-            'acquisition_date' => 'required|date',
-            'service_required' => 'boolean',
+            'name'                 => 'required|string',
+            'group_id'             => 'nullable|exists:item_types,id',
+            'category_id'          => 'required|exists:categories,id',
+            'location_id'          => 'required|exists:locations,id',
+            'condition'            => 'required|in:baik,rusak,perbaikan,dimusnahkan',
+            'photo'                => 'nullable|image',
+            'service_interval_days'=> 'nullable|integer',
+            'acquisition_date'     => 'required|date',
+            'service_required'     => 'boolean',
+            'quantity'             => 'nullable|integer|min:1|max:100',
         ]);
 
-        $validated['uqcode'] = $this->generateUqcode(
-            $validated['location_id'],
-            $validated['category_id'],
-            $validated['acquisition_date']
-        );
+        // Resolve group from group_id or name
+        if (!empty($validated['group_id'])) {
+            $group = ItemType::find($validated['group_id']);
+            if ($group) {
+                $validated['name'] = $group->name;
+            }
+        } else {
+            // Try to find or create group by name
+            $group = ItemType::where('name', $validated['name'])->first();
+            if ($group) {
+                $validated['group_id'] = $group->id;
+            }
+        }
 
+        $quantity = $request->input('quantity', 1);
+        $createdItems = [];
+        $firstUqcode = null;
+
+        // Handle photo upload once if possible, or copy per item?
+        // Since we are creating multiple records, we should probably upload once and reuse the path
+        // BUT standard implementation would likely be one photo file for all identical items if they are physically identical types.
+        $photoPath = null;
         if ($request->hasFile('photo')) {
             $imageService = app(ImageOptimizationService::class);
-            $validated['photo_path'] = $imageService->optimizeAndStore(
+            $photoPath = $imageService->optimizeAndStore(
                 $request->file('photo'),
                 'items',
                 ['quality' => 80, 'max_width' => 1200, 'max_height' => 1200]
@@ -188,25 +246,61 @@ class ItemController extends Controller
             $validated['last_service_date'] = $validated['acquisition_date'];
         }
 
-        // Remove photo from validated data as it's not a database column
+        // Remove photo and quantity from validated data for the loop
         unset($validated['photo']);
+        unset($validated['quantity']);
 
-        $item = Item::create($validated);
-
-        if ($request->input('auto_qr') == '1') {
-            return redirect()->route('items.download_qr', $item->id)
-                ->with('success', 'Item created successfully. Code: ' . $validated['uqcode']);
+        // Add photo path if it exists
+        if ($photoPath) {
+            $validated['photo_path'] = $photoPath;
         }
 
-        return redirect()->route('items.index')
-            ->with('success', 'Item created successfully. Code: ' . $validated['uqcode']);
+        for ($i = 0; $i < $quantity; $i++) {
+            // Generate UQ Code for each item (serial will increment)
+            $code = $this->generateUqcode(
+                $validated['location_id'],
+                $validated['category_id'],
+                $validated['acquisition_date'],
+                $validated['name']
+            );
+
+            $itemData = $validated;
+            $itemData['uqcode'] = $code;
+
+            $item = Item::create($itemData);
+            $createdItems[] = $item->id;
+
+            if ($i === 0) {
+                $firstUqcode = $code;
+            }
+        }
+
+        if ($request->input('auto_qr') == '1' && count($createdItems) > 0) {
+            $format = count($createdItems) > 1 ? 'zip' : 'img';
+            $msg = $quantity > 1
+                ? "$quantity Barang berhasil ditambahkan. Unduhan QR ($format) akan segera dimulai."
+                : 'Barang berhasil ditambahkan. Unduhan QR akan segera dimulai.';
+
+            return redirect()->route('items.index')
+                ->with('success', $msg)
+                ->with('trigger_download_qr', [
+                    'item_ids' => $createdItems,
+                    'format' => $format,
+                ]);
+        }
+
+        $msg = $quantity > 1
+            ? "$quantity Barang berhasil ditambahkan. Kode awal: $firstUqcode"
+            : "Barang berhasil ditambahkan. Kode: $firstUqcode";
+
+        return redirect()->route('items.index')->with('success', $msg);
     }
 
     public function quickQr(Item $item)
     {
         return redirect()->route('qr.generate', [
             'item_ids' => [$item->id],
-            'format' => 'img'
+            'format' => 'img',
         ]);
     }
 
@@ -215,14 +309,14 @@ class ItemController extends Controller
         return view('items.download_qr', [
             'item' => $item,
             'title' => 'Mengunduh Label QR',
-            'message' => 'Gambar label untuk ' . $item->name . ' sedang disiapkan.',
+            'message' => 'Gambar label untuk '.$item->name.' sedang disiapkan.',
             'downloadUrl' => route('qr.download_file'),
             'redirectUrl' => route('items.index'),
             'method' => 'POST',
             'params' => [
                 'item_ids' => [$item->id],
-                'format' => 'img'
-            ]
+                'format' => 'img',
+            ],
         ]);
     }
 
@@ -234,7 +328,7 @@ class ItemController extends Controller
     public function edit(Item $item)
     {
         $user = auth()->user();
-        if (!$user->canAccessLocation($item->location_id)) {
+        if (! $user->canAccessLocation($item->location_id)) {
             abort(403, 'Anda tidak memiliki akses ke barang di lokasi ini.');
         }
 
@@ -263,32 +357,50 @@ class ItemController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string',
-            'category_id' => 'required|exists:categories,id',
-            'location_id' => 'required|exists:locations,id',
-            'condition' => 'required|in:baik,rusak,perbaikan,dimusnahkan',
-            'photo' => 'nullable|image',
-            'service_interval_days' => 'nullable|integer',
-            'acquisition_date' => 'required|date',
-            'service_required' => 'boolean',
+            'name'                 => 'required|string',
+            'group_id'             => 'nullable|exists:item_types,id',
+            'category_id'          => 'required|exists:categories,id',
+            'location_id'          => 'required|exists:locations,id',
+            'condition'            => 'required|in:baik,rusak,perbaikan,dimusnahkan',
+            'photo'                => 'nullable|image',
+            'service_interval_days'=> 'nullable|integer',
+            'acquisition_date'     => 'required|date',
+            'service_required'     => 'boolean',
         ]);
 
-        if ($item->location_id != $validated['location_id'] || $item->category_id != $validated['category_id']) {
+        // Resolve group from group_id or name
+        if (!empty($validated['group_id'])) {
+            $group = ItemType::find($validated['group_id']);
+            if ($group) {
+                $validated['name'] = $group->name;
+            }
+        } else {
+            $group = ItemType::where('name', $validated['name'])->first();
+            if ($group) {
+                $validated['group_id'] = $group->id;
+            }
+        }
+
+        if ($item->location_id != $validated['location_id'] || $item->category_id != $validated['category_id'] || $item->name != $validated['name']) {
             $oldUqcode = $item->uqcode;
             $newUqcode = $this->generateUqcode(
                 $validated['location_id'],
                 $validated['category_id'],
-                $validated['acquisition_date']
+                $validated['acquisition_date'],
+                $validated['name']
             );
 
             $validated['uqcode'] = $newUqcode;
 
-            ItemHistory::create([
-                'item_id' => $item->id,
-                'old_uqcode' => $oldUqcode,
-                'new_uqcode' => $newUqcode,
-                'reason' => 'Location or Category changed',
-            ]);
+            // Only create history if code actually changed (it should, but just in case)
+            if ($oldUqcode !== $newUqcode) {
+                ItemHistory::create([
+                    'item_id' => $item->id,
+                    'old_uqcode' => $oldUqcode,
+                    'new_uqcode' => $newUqcode,
+                    'reason' => 'Location, Category, or Name changed',
+                ]);
+            }
         }
 
         if ($request->hasFile('photo')) {
@@ -332,14 +444,89 @@ class ItemController extends Controller
         $request->validate([
             'location_id' => 'required|exists:locations,id',
             'category_id' => 'required|exists:categories,id',
+            'name'        => 'nullable|string',
+            'group_id'    => 'nullable|exists:item_types,id',
         ]);
 
-        $count = Item::where('location_id', $request->location_id)
-            ->where('category_id', $request->category_id)
-            ->count() + 1;
+        $itemName = $request->input('name', '');
+
+        // If group_id provided, use group name
+        if ($request->filled('group_id')) {
+            $group = ItemType::find($request->group_id);
+            if ($group) {
+                $itemName = $group->name;
+            }
+        }
+
+        $location = Location::find($request->location_id);
+        $category = Category::find($request->category_id);
+
+        $nameCode = $this->getNameCode($itemName);
+
+        $prefix = sprintf('%s.%s.%s.', $location->unique_code, $category->unique_code, $nameCode);
+        $count = Item::where('uqcode', 'LIKE', $prefix . '%')->count() + 1;
 
         return response()->json([
-            'serial' => str_pad($count, 3, '0', STR_PAD_LEFT),
+            'serial'    => str_pad($count, 3, '0', STR_PAD_LEFT),
+            'name_code' => $nameCode,
         ]);
+    }
+
+    public function searchNames(Request $request)
+    {
+        $search = $request->input('q');
+
+        // 1. Search Standardized Item Types
+        $standardQuery = \App\Models\ItemType::select('name')
+            ->withCount('items');
+
+        if ($search) {
+            $standardQuery->where('name', 'LIKE', "%$search%");
+        }
+
+        $standardItems = $standardQuery->limit(5)->get()->map(function ($type) {
+            return [
+                'name' => $type->name,
+                'count' => $type->items_count,
+                'is_standard' => true,
+            ];
+        });
+
+        // 2. Search Existing Items (as fallback/supplement)
+        $user = auth()->user();
+        $itemQuery = Item::select('name')
+            ->selectRaw('COUNT(*) as total_count')
+            ->where('is_active', true);
+
+        // Location-based Access Check
+        if (! $user->isRoot()) {
+            $authorizedLocations = $user->authorizedLocations();
+            if ($authorizedLocations->isNotEmpty()) {
+                $itemQuery->whereIn('location_id', $authorizedLocations->pluck('id'));
+            }
+        }
+
+        if ($search) {
+            $itemQuery->where('name', 'LIKE', "%$search%");
+        }
+
+        // Exclude names already found in standard items to avoid duplicates
+        if ($standardItems->isNotEmpty()) {
+            $itemQuery->whereNotIn('name', $standardItems->pluck('name'));
+        }
+
+        $existingItems = $itemQuery->groupBy('name')
+            ->orderBy('name')
+            ->limit(10)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'name' => $item->name,
+                    'count' => $item->total_count,
+                    'is_standard' => false,
+                ];
+            });
+
+        return response()->json($standardItems->merge($existingItems));
     }
 }

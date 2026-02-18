@@ -4,11 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class Item extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'uqcode',
         'name',
+        'group_id',
         'category_id',
         'location_id',
         'condition',
@@ -102,6 +107,11 @@ class Item extends Model
         }
 
         return "Akan Datang ($days Hari lagi)";
+    }
+
+    public function group()
+    {
+        return $this->belongsTo(ItemType::class, 'group_id');
     }
 
     public function category()

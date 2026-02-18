@@ -28,7 +28,7 @@ class LoginController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'username' => __('auth.failed'),
+            'username' => __('auth.failed!'),
         ]);
     }
 

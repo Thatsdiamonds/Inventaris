@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReportLayoutController;
@@ -18,11 +19,18 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['permission:access_reports'])->group(function () {
         Route::get('/reports', [ReportController::class, 'menu'])->name('reports.menu');
-        Route::get('/reports/inventory', [ReportController::class, 'index'])->name('reports.inventory');
+        
+        // Inventory Reports
         Route::post('/reports/inventory', [ReportController::class, 'generate'])->name('reports.inventory.generate');
-        Route::post('/reports/inventory/download-file', [ReportController::class, 'downloadFile'])->name('reports.inventory.download_file');
-        Route::post('/reports/services', [ServiceReportController::class, 'generate'])->name('reports.services.generate');
-        Route::post('/reports/services/download-file', [ServiceReportController::class, 'downloadFile'])->name('reports.services.download_file');
+        Route::post('/reports/inventory/download', [ReportController::class, 'downloadInventory'])->name('reports.inventory.download_file');
+        
+        // Service Reports
+        Route::post('/reports/services', [ReportController::class, 'generate'])->name('reports.services.generate')->defaults('type', 'services');
+        Route::post('/reports/services/download', [ReportController::class, 'downloadServices'])->name('reports.services.download_file');
+        
+        // Live Preview
+        Route::post('/reports/preview', [ReportController::class, 'preview'])->name('reports.preview');
+
         Route::get('/reports/layout/{type}', [ReportLayoutController::class, 'edit'])->name('reports.layout.edit');
         Route::post('/reports/layout/{type}', [ReportLayoutController::class, 'save'])->name('reports.layout.save');
     });
@@ -107,6 +115,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('items/{item}/quick-qr', [ItemController::class, 'quickQr'])->name('items.quick_qr');
         Route::get('items/{item}/download-qr', [ItemController::class, 'downloadQr'])->name('items.download_qr');
         Route::get('api/items/next-serial', [ItemController::class, 'getNextSerial'])->name('api.items.next-serial');
+        Route::get('api/items/search-names', [ItemController::class, 'searchNames'])->name('api.items.search-names');
         Route::get('qr', [App\Http\Controllers\QrController::class, 'index'])->name('qr.index');
         Route::match(['get', 'post'], 'qr/generate', [App\Http\Controllers\QrController::class, 'generate'])->name('qr.generate');
         Route::post('qr/download-file', [App\Http\Controllers\QrController::class, 'downloadFile'])->name('qr.download_file');
@@ -130,6 +139,13 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['permission:access_locations'])->group(function () {
         Route::resource('locations', LocationController::class);
         Route::get('locations/{location}/items', [LocationController::class, 'getItems'])->name('locations.items');
+    });
+
+    Route::middleware(['permission:access_items'])->group(function () {
+        Route::resource('item-types', ItemTypeController::class);
+        Route::get('api/item-types/list', [ItemTypeController::class, 'apiList'])->name('api.item-types.list');
+        Route::post('api/item-types/save', [ItemTypeController::class, 'apiSave'])->name('api.item-types.save');
+        Route::get('api/item-types/{itemType}', [ItemTypeController::class, 'apiGet'])->name('api.item-types.get');
     });
 
     Route::middleware(['permission:access_settings'])->group(function () {

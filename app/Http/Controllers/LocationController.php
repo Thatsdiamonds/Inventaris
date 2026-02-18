@@ -42,6 +42,8 @@ class LocationController extends Controller
         ]);
 
         Location::create($validated);
+        
+        \Illuminate\Support\Facades\Cache::forget('locations_all');
 
         return redirect()->route('locations.index')->with('success', 'Location created successfully.');
     }
@@ -133,12 +135,16 @@ class LocationController extends Controller
             }
         }
 
+        \Illuminate\Support\Facades\Cache::forget('locations_all');
+        
         return redirect()->route('locations.index')->with('success', 'Location updated successfully.');
     }
 
     public function destroy(Location $location)
     {
         $location->delete();
+        \Illuminate\Support\Facades\Cache::forget('locations_all');
+        
         return redirect()->route('locations.index')->with('success', 'Location deleted successfully.');
     }
 

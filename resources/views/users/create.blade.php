@@ -1,54 +1,77 @@
 @extends('layouts.app')
 
 @section('content')
-    <h1>Tambah Pengguna Baru</h1>
+    <div class="page-header mb-4">
+        <h1 class="mb-0">Tambah Pengguna Baru</h1>
+        <p class="text-secondary">Buat akun pengguna baru dan tetapkan peran</p>
+    </div>
 
-    <form action="{{ route('users.store') }}" method="POST"
-        style="background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee;">
-        @csrf
-
-        <div style="margin-bottom: 15px;">
-            <label><strong>Nama Lengkap:</strong></label><br>
-            <input type="text" name="name" required style="width: 100%; padding: 8px; margin-top: 5px;">
-        </div>
-
-        <div style="margin-bottom: 15px;">
-            <label><strong>Username:</strong></label><br>
-            <input type="text" name="username" required style="width: 100%; padding: 8px; margin-top: 5px;">
-        </div>
-
-        <div style="margin-bottom: 15px;">
-            <label><strong>Password:</strong></label><br>
-            <input type="password" name="password" required style="width: 100%; padding: 8px; margin-top: 5px;">
-        </div>
-
-        <div style="margin-bottom: 15px;">
-            <label><strong>Konfirmasi Password:</strong></label><br>
-            <input type="password" name="password_confirmation" required
-                style="width: 100%; padding: 8px; margin-top: 5px;">
-        </div>
-
-        <div style="margin-bottom: 20px;">
-            <label><strong>Pilih Role:</strong></label><br>
-            <select name="role_id" required style="width: 100%; padding: 8px; margin-top: 5px;">
-                <option value="">-- Pilih Role --</option>
-                @foreach ($roles as $role)
-                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+    @if ($errors->any())
+        <div class="alert alert-error mb-4">
+            <ul class="mb-0 pl-4">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
                 @endforeach
-            </select>
+            </ul>
         </div>
+    @endif
 
-        <div style="margin-bottom: 15px;">
-            <label><strong>Catatan/Alias (Opsional):</strong></label><br>
-            <textarea name="notes" style="width: 100%; padding: 8px; margin-top: 5px; height: 80px;"
-                placeholder="Contoh: Staf Admin Kantor Pusat"></textarea>
-        </div>
+    <div class="card">
+        <form action="{{ route('users.store') }}" method="POST">
+            @csrf
 
-        <div style="margin-top: 20px;">
-            <button type="submit"
-                style="background: #1890ff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Simpan
-                Pengguna</button>
-            <a href="{{ route('users.index') }}" style="margin-left: 15px; color: #666; text-decoration: none;">Batal</a>
-        </div>
-    </form>
+            <h3 class="card-title mb-4">Informasi Akun</h3>
+
+            <div class="grid-2 gap-4 mb-4">
+                <div class="form-group">
+                    <label>Nama Lengkap <span class="text-danger">*</span></label>
+                    <input type="text" name="name" value="{{ old('name') }}" required
+                        placeholder="Contoh: John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label>Username <span class="text-danger">*</span></label>
+                    <input type="text" name="username" value="{{ old('username') }}" required
+                        placeholder="Contoh: johndoe">
+                </div>
+            </div>
+
+            <div class="grid-2 gap-4 mb-4">
+                <div class="form-group">
+                    <label>Password <span class="text-danger">*</span></label>
+                    <input type="password" name="password" required placeholder="Min. 8 karakter">
+                </div>
+
+                <div class="form-group">
+                    <label>Konfirmasi Password <span class="text-danger">*</span></label>
+                    <input type="password" name="password_confirmation" required placeholder="Ulangi password">
+                </div>
+            </div>
+
+            <h3 class="card-title mb-4 mt-2">Akses & Peran</h3>
+
+            <div class="form-group mb-4">
+                <label>Peran (Role) <span class="text-danger">*</span></label>
+                <select name="role_id" required>
+                    <option value="">-- Pilih Peran --</option>
+                    @foreach ($roles as $role)
+                        <option value="{{ $role->id }}" {{ old('role_id') == $role->id ? 'selected' : '' }}>
+                            {{ $role->name }}
+                        </option>
+                    @endforeach
+                </select>
+                <small class="text-muted">Peran menentukan hak akses pengguna dalam sistem.</small>
+            </div>
+
+            <div class="form-group mb-6">
+                <label>Catatan (Opsional)</label>
+                <textarea name="notes" rows="3" placeholder="Tambahkan catatan tentang pengguna ini...">{{ old('notes') }}</textarea>
+            </div>
+
+            <div class="flex-end gap-2">
+                <a href="{{ route('users.index') }}" class="btn btn-ghost">Batal</a>
+                <button type="submit" class="btn btn-primary">Simpan Pengguna</button>
+            </div>
+        </form>
+    </div>
 @endsection

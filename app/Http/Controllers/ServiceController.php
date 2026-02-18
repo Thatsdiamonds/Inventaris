@@ -108,13 +108,20 @@ class ServiceController extends Controller
         
         $upcomingFilter = $request->input('upcoming_filter', '30_days');
         
-        $upcomingQuery->where(function ($q) use ($today, $thirtyDaysLater, $upcomingFilter) {
+        $upcomingQuery->where(function ($q) use ($today, $upcomingFilter) {
             $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
             
             $q->whereRaw("$rawNextDate > ?", [$today]);
             
-            if ($upcomingFilter == '30_days') {
-                $q->whereRaw("$rawNextDate <= ?", [$thirtyDaysLater]);
+            if ($upcomingFilter == '1_week') {
+                $limitDate = date('Y-m-d', strtotime('+7 days'));
+                $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
+            } elseif ($upcomingFilter == '30_days') {
+                $limitDate = date('Y-m-d', strtotime('+30 days'));
+                $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
+            } elseif ($upcomingFilter == '2_months') {
+                $limitDate = date('Y-m-d', strtotime('+60 days'));
+                $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
             }
         });
         
@@ -156,10 +163,20 @@ class ServiceController extends Controller
                 ->where('service_required', true)
                 ->whereNotNull('service_interval_days')
                 ->when(!empty($authLocIds), fn($q) => $q->whereIn('location_id', $authLocIds))
-                ->where(function ($q) use ($today, $thirtyDaysLater) {
+                ->where(function ($q) use ($today, $upcomingFilter) {
                     $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
-                    $q->whereRaw("$rawNextDate > ?", [$today])
-                        ->whereRaw("$rawNextDate <= ?", [$thirtyDaysLater]);
+                    $q->whereRaw("$rawNextDate > ?", [$today]);
+                    
+                    if ($upcomingFilter == '1_week') {
+                        $limitDate = date('Y-m-d', strtotime('+7 days'));
+                        $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
+                    } elseif ($upcomingFilter == '30_days') {
+                        $limitDate = date('Y-m-d', strtotime('+30 days'));
+                        $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
+                    } elseif ($upcomingFilter == '2_months') {
+                        $limitDate = date('Y-m-d', strtotime('+60 days'));
+                        $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
+                    }
                 })
                 ->whereDoesntHave('services', function ($q) {
                     $q->whereNull('date_out');

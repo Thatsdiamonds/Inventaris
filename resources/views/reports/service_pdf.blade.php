@@ -197,7 +197,7 @@
                 <th>Vendor Servis</th>
                 <th>Tgl Masuk</th>
                 <th>Tgl Selesai</th>
-                <th>Catatan / Masalah</th>
+                <th>Biaya (Rp)</th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -206,17 +206,17 @@
                 <tr>
                     <td align="center">{{ $i + 1 }}</td>
                     <td><code
-                            style="background: #eee; padding: 2px 4px; border-radius: 3px;">{{ $s->item->uqcode }}</code>
+                            style="background: #f8f9fa; padding: 2px 4px; border-radius: 3px; font-size: 8pt;">{{ $s->item->uqcode }}</code>
                     </td>
                     <td>{{ $s->item->name }}</td>
                     <td>{{ $s->vendor }}</td>
-                    <td>{{ \Carbon\Carbon::parse($s->date_in)->format('d/m/Y') }}</td>
-                    <td>
+                    <td align="center">{{ \Carbon\Carbon::parse($s->date_in)->format('d/m/Y') }}</td>
+                    <td align="center">
                         {{ $s->date_out ? \Carbon\Carbon::parse($s->date_out)->format('d/m/Y') : '-' }}
                     </td>
-                    <td>{{ $s->description }}</td>
-                    <td>
-                        @if ($s->finished_at)
+                    <td align="right">{{ number_format($s->cost, 0, ',', '.') }}</td>
+                    <td align="center">
+                        @if ($s->date_out)
                             <span class="status-badge status-done">Selesai</span>
                         @else
                             <span class="status-badge status-pending">Proses</span>
@@ -230,6 +230,13 @@
                     </td>
                 </tr>
             @endforelse
+            @if ($services->count() > 0)
+                <tr style="background-color: #f2f2f2; font-weight: bold;">
+                    <td colspan="6" align="right">TOTAL BIAYA SERVIS</td>
+                    <td align="right">{{ number_format($summary['total_cost'], 0, ',', '.') }}</td>
+                    <td></td>
+                </tr>
+            @endif
         </tbody>
     </table>
 
@@ -237,9 +244,11 @@
         <div class="summary-title">RINGKASAN SERVIS</div>
         <table width="100%">
             <tr>
-                <td width="33%">Total Tiket Servis: <strong>{{ $summary['total'] }}</strong></td>
-                <td width="33%">Sedang Diproses: <strong>{{ $summary['proses'] }}</strong></td>
-                <td width="33%">Selesai Diperbaiki: <strong>{{ $summary['selesai'] }}</strong></td>
+                <td width="25%">Total Tiket: <strong>{{ $summary['total'] }}</strong></td>
+                <td width="25%">Proses: <strong>{{ $summary['proses'] }}</strong></td>
+                <td width="25%">Selesai: <strong>{{ $summary['selesai'] }}</strong></td>
+                <td width="25%">Total Biaya: <strong>Rp
+                        {{ number_format($summary['total_cost'], 0, ',', '.') }}</strong></td>
             </tr>
         </table>
     </div>

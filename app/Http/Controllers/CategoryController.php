@@ -46,6 +46,8 @@ class CategoryController extends Controller
         ]);
 
         Category::create($validated);
+        
+        \Illuminate\Support\Facades\Cache::forget('categories_all');
 
         return redirect()->route('categories.index')->with('success', 'Category created successfully.');
     }
@@ -145,12 +147,15 @@ class CategoryController extends Controller
             }
         }
 
+        \Illuminate\Support\Facades\Cache::forget('categories_all');
+
         return redirect()->route('categories.index')->with('success', 'Category updated successfully.');
     }
 
     public function destroy(Category $category)
     {
         $category->delete();
+        \Illuminate\Support\Facades\Cache::forget('categories_all');
 
         return redirect()->route('categories.index')->with('success', 'Category deleted successfully.');
     }
