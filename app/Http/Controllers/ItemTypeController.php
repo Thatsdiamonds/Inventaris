@@ -58,20 +58,17 @@ class ItemTypeController extends Controller
         $oldCode = $itemType->unique_code;
         $newCode = $validated['unique_code'];
 
-        DB::transaction(function () use ($itemType, $validated, $oldCode, $newCode) {
-            $itemType->update($validated);
+        $itemType->update($validated);
 
-            // If unique_code changed, update all related items' uqcodes
-            if ($oldCode !== $newCode) {
-                $items = Item::where('group_id', $itemType->id)->get();
-                foreach ($items as $item) {
-                    $newUqcode = str_replace('.' . $oldCode . '.', '.' . $newCode . '.', $item->uqcode);
-                    if ($newUqcode !== $item->uqcode) {
-                        $item->update(['uqcode' => $newUqcode]);
-                    }
-                }
-            }
-        });
+        if ($oldCode !== $newCode) {
+            return redirect()->route('items.process_update', [
+                'type' => 'group',
+                'id' => $itemType->id,
+                'old_code' => $oldCode,
+                'new_code' => $newCode,
+                'redirect_url' => route('item-types.index')
+            ]);
+        }
 
         return redirect()->route('item-types.index')->with('success', 'Grup nama aset berhasil diperbarui.');
     }
@@ -131,18 +128,22 @@ class ItemTypeController extends Controller
             $oldCode = $itemType->unique_code;
             $newCode = $validated['unique_code'];
 
-            DB::transaction(function () use ($itemType, $validated, $oldCode, $newCode) {
-                $itemType->update($validated);
-                if ($oldCode !== $newCode) {
-                    $items = Item::where('group_id', $itemType->id)->get();
-                    foreach ($items as $item) {
-                        $newUqcode = str_replace('.' . $oldCode . '.', '.' . $newCode . '.', $item->uqcode);
-                        if ($newUqcode !== $item->uqcode) {
-                            $item->update(['uqcode' => $newUqcode]);
-                        }
-                    }
-                }
-            });
+            if ($oldCode !== $newCode) {
+                $itemType->update($validated); // Save the metadata first
+                return response()->json([
+                    'success' => true,
+                    'requires_sync' => true,
+                    'sync_url' => route('items.process_update', [
+                        'type' => 'group',
+                        'id' => $itemType->id,
+                        'old_code' => $oldCode,
+                        'new_code' => $newCode,
+                        'redirect_url' => $request->input('redirect_url', route('items.index'))
+                    ])
+                ]);
+            }
+
+            $itemType->update($validated);
 
             $itemType->refresh();
             return response()->json([

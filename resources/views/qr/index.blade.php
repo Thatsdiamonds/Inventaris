@@ -3,7 +3,16 @@
 @section('content')
     <div class="page-header mb-3">
         <h1 class="mb-0">Cetak Label QR</h1>
-        <p class="text-secondary">Pilih barang yang ingin dibuatkan label QR Code.</p>
+        <div style="display: flex; gap: 0.75rem;">
+            <a href="{{ route('qr.print_images') }}" wire:navigate class="btn btn-secondary btn-sm">
+                <svg class="icon icon-sm">
+                    <use href="#icon-image"></use>
+                </svg>
+                Cetak dari File Gambar
+            </a>
+            <p class="text-secondary" style="margin: 0; align-self: center;">Pilih barang yang ingin dibuatkan label QR Code.
+            </p>
+        </div>
     </div>
 
     @if (session('error'))

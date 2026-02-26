@@ -6,165 +6,112 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cetak Label QR - {{ $appName }}</title>
     <style>
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
         body {
-            font-family: 'Helvetica', 'Arial', sans-serif;
-            background: #f0f0f0;
-            padding: 20px;
-        }
-
-        .page-container {
-            background: white;
-            padding: 20px;
-            width: 210mm;
-            /* A4 width */
-            min-height: 297mm;
-            /* A4 height */
-            margin: 0 auto;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .labels-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5mm;
-            justify-content: flex-start;
-        }
-
-        .label-card {
-            width: 7cm;
-            height: 3cm;
-            border: 1px solid #000;
-            box-sizing: border-box;
-            display: flex;
-            padding: 2mm;
-            position: relative;
-            background: white;
-            page-break-inside: avoid;
-        }
-
-        .label-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            font-size: 8pt;
-            line-height: 1.2;
-            overflow: hidden;
-            padding-right: 2mm;
-        }
-
-        .label-qr {
-            width: 26mm;
-            height: 26mm;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .label-qr img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        .org-name {
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 9pt;
-            margin-bottom: 2mm;
-            border-bottom: 1px solid #000;
-            padding-bottom: 1mm;
-        }
-
-        .item-info {
-            display: flex;
-            flex-direction: column;
-            gap: 1mm;
-        }
-
-        .info-row {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6;
+            -webkit-print-color-adjust: exact;
         }
 
         .no-print {
-            text-align: center;
-            margin-bottom: 20px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+            backdrop-filter: blur(5px);
         }
 
         .btn {
-            background: #333;
-            color: white;
-            border: none;
-            padding: 10px 20px;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
             cursor: pointer;
-            border-radius: 5px;
+            border: none;
+            transition: all 0.2s;
             font-size: 14px;
-            margin: 0 5px;
         }
 
-        .btn:hover {
-            background: #555;
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            padding: 13.5mm 5mm;
+            box-sizing: border-box;
+            background: white;
+            display: grid;
+            grid-template-columns: 100mm 100mm;
+            grid-template-rows: repeat(9, 30mm);
+            gap: 0;
+            page-break-after: always;
+            margin: 20px auto;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .label-image {
+            width: 100mm;
+            height: 30mm;
+            display: block;
         }
 
         @media print {
             body {
                 background: white;
-                padding: 0;
-            }
-
-            .page-container {
-                box-shadow: none;
                 margin: 0;
-                width: 100%;
+                padding: 0;
             }
 
             .no-print {
                 display: none;
             }
 
-            .label-card {
-                border: 1px solid #000;
-                /* Ensure border prints */
+            .page {
+                margin: 0;
+                box-shadow: none;
             }
         }
     </style>
 </head>
 
 <body>
-
     <div class="no-print">
-        <button class="btn" onclick="window.print()">Cetak Halaman</button>
-        <button class="btn" onclick="window.close()">Tutup Jendela</button>
-        <p style="margin-top: 10px; color: #666; font-size: 12px;">Pastikan "Background Graphics" dicentang pada
-            pengaturan cetak browser untuk hasil terbaik.</p>
+        <button class="btn btn-primary" onclick="window.print()">Cetak Sekarang</button>
+        <button class="btn" onclick="window.history.back()" style="background: #64748b; color: white;">Kembali</button>
     </div>
 
-    <div class="page-container">
-        <div class="labels-grid">
-            @foreach ($items as $item)
-                <div class="label-card">
-                    <div class="label-content">
-                        <div class="org-name">{{ $appName }}</div>
-                        <div class="item-info">
-                            <div class="info-row"><strong>Kode:</strong> {{ $item->uqcode }}</div>
-                            <div class="info-row"><strong>Nama:</strong> {{ substr($item->name, 0, 20) }}</div>
-                            <div class="info-row"><strong>Lokasi:</strong>
-                                {{ substr($item->location->name ?? '-', 0, 15) }}</div>
-                        </div>
-                    </div>
-                    <div class="label-qr">
-                        @if (isset($qrCodes[$item->id]))
-                            <img src="data:image/png;base64,{{ $qrCodes[$item->id] }}" alt="QR Code">
-                        @endif
-                    </div>
-                </div>
-            @endforeach
-        </div>
-    </div>
+    <div style="padding-top: 60px;">
+        @php
+            $itemsPerPage = 18;
+            $chunks = $items->chunk($itemsPerPage);
+        @endphp
 
+        @foreach ($chunks as $pageItems)
+            <div class="page">
+                @foreach ($pageItems as $item)
+                    @if (isset($labelImages[$item->id]))
+                        <img src="data:image/jpeg;base64,{{ $labelImages[$item->id] }}" alt="Label"
+                            class="label-image">
+                    @endif
+                @endforeach
+            </div>
+        @endforeach
+    </div>
 </body>
 
 </html>

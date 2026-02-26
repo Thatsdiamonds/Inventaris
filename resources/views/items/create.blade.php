@@ -205,12 +205,24 @@
                         $autoDownload = $setting ? $setting->auto_download_after_add : true;
                     @endphp
 
-                    <label
-                        style="display: flex; align-items: flex-start; gap: 0.5rem; text-align: left; background: var(--color-bg-tertiary); padding: 0.75rem; border-radius: var(--radius-md); cursor: pointer; border: 1px solid var(--color-border-light);">
-                        <input type="checkbox" name="auto_qr" id="auto_qr" value="1"
-                            {{ $autoDownload ? 'checked' : '' }} style="margin-top: 2px;">
-                        <span style="font-size: 0.8rem; font-weight: 500;">Unduh QR otomatis setelah menyimpan data</span>
-                    </label>
+                    <div
+                        style="display: flex; flex-direction: column; gap: 0.5rem; background: var(--color-bg-tertiary); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--color-border-light);">
+                        <label
+                            style="display: flex; align-items: flex-start; gap: 0.5rem; text-align: left; cursor: pointer;">
+                            <input type="checkbox" name="auto_qr" id="auto_qr" value="1"
+                                {{ $autoDownload ? 'checked' : '' }} style="margin-top: 2px;">
+                            <span style="font-size: 0.8rem; font-weight: 500;">Unduh QR otomatis setelah menyimpan
+                                data</span>
+                        </label>
+                        <div style="height: 1px; background: var(--color-border-light); margin: 0.25rem 0;"></div>
+                        <label
+                            style="display: flex; align-items: flex-start; gap: 0.5rem; text-align: left; cursor: pointer;">
+                            <input type="checkbox" name="auto_print" id="auto_print" value="1"
+                                style="margin-top: 2px;">
+                            <span style="font-size: 0.8rem; font-weight: 500; color: var(--color-accent);">Cetak Label
+                                otomatis (Quick Print)</span>
+                        </label>
+                    </div>
                 </div>
 
                 <button type="submit" id="submit_btn" class="btn btn-primary btn-lg"
@@ -424,9 +436,20 @@
 
             function updateBtnText() {
                 const cb = document.getElementById('auto_qr');
+                const ap = document.getElementById('auto_print');
                 const btn = document.getElementById('submit_btn');
                 if (!cb || !btn) return;
-                btn.innerText = cb.checked ? "Simpan dan Unduh QR" : "Simpan Barang";
+
+                if (ap && ap.checked) {
+                    btn.innerText = "Simpan dan Cetak Label";
+                    btn.style.backgroundColor = "var(--color-accent)";
+                } else if (cb.checked) {
+                    btn.innerText = "Simpan dan Unduh QR";
+                    btn.style.backgroundColor = "";
+                } else {
+                    btn.innerText = "Simpan Barang";
+                    btn.style.backgroundColor = "";
+                }
             }
 
             function initPage() {
@@ -436,8 +459,23 @@
                 });
                 const serviceRequiredCb = document.getElementById('service_required');
                 if (serviceRequiredCb) serviceRequiredCb.addEventListener('change', toggleInterval);
+
                 const autoQrCb = document.getElementById('auto_qr');
-                if (autoQrCb) autoQrCb.addEventListener('change', updateBtnText);
+                if (autoQrCb) autoQrCb.addEventListener('change', () => {
+                    if (autoQrCb.checked && document.getElementById('auto_print')) {
+                        document.getElementById('auto_print').checked = false;
+                    }
+                    updateBtnText();
+                });
+
+                const autoPrintCb = document.getElementById('auto_print');
+                if (autoPrintCb) autoPrintCb.addEventListener('change', () => {
+                    if (autoPrintCb.checked && document.getElementById('auto_qr')) {
+                        document.getElementById('auto_qr').checked = false;
+                    }
+                    updateBtnText();
+                });
+
                 updateBtnText();
                 updatePreview();
             }
@@ -619,6 +657,7 @@
                     if (id) body.append('id', id);
                     body.append('name', name);
                     body.append('unique_code', code);
+                    body.append('redirect_url', window.location.href);
 
                     const res = await fetch('{{ route('api.item-types.save') }}', {
                         method: 'POST',
@@ -627,6 +666,10 @@
                     const data = await res.json();
 
                     if (data.success) {
+                        if (data.requires_sync) {
+                            window.location.href = data.sync_url;
+                            return;
+                        }
                         showModalAlert('Grup berhasil disimpan.', 'success');
                         cancelModalEdit();
                         loadGroups();

@@ -28,7 +28,7 @@
 
         <!-- SIDEBAR FILTERS -->
         <div class="card card-sticky">
-            <form id="reportForm" method="POST" action="">
+            <form id="reportForm" method="POST" action="{{ route('reports.inventory.generate') }}">
                 @csrf
 
                 <!-- INVENTORY FILTERS -->
@@ -75,10 +75,10 @@
                         <label>Kondisi</label>
                         <select name="condition" class="form-select" onchange="updatePreview()">
                             <option value="all">Semua Kondisi</option>
-                            <option value="Baik">Baik</option>
-                            <option value="Rusak">Rusak</option>
-                            <option value="Perbaikan">Dalam Perbaikan</option>
-                            <option value="Dimusnahkan">Dimusnahkan</option>
+                            <option value="baik">Baik</option>
+                            <option value="rusak">Rusak</option>
+                            <option value="perbaikan">Dalam Perbaikan</option>
+                            <option value="dimusnahkan">Dimusnahkan</option>
                         </select>
                     </div>
                 </div>

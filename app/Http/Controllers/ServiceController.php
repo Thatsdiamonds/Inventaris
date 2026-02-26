@@ -143,40 +143,36 @@ class ServiceController extends Controller
             ->paginate(20, ['*'], 'all_page')
             ->withQueryString();
 
+        $today = date('Y-m-d');
+        $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
+
+        // Optimized Counts using conditional aggregation or targeted queries
         $counts = [
-            'in_service' => Service::whereNull('date_out')
-                ->when(!empty($authLocIds), function($q) use ($authLocIds) {
+            'in_service' => Service::when(!empty($authLocIds), function($q) use ($authLocIds) {
                     $q->whereHas('item', fn($iq) => $iq->whereIn('location_id', $authLocIds));
-                })->count(),
+                })->whereNull('date_out')->count(),
+            
             'needs_service' => Item::where('is_active', true)
                 ->where('service_required', true)
+                ->where('condition', '!=', 'perbaikan')
                 ->whereNotNull('service_interval_days')
                 ->when(!empty($authLocIds), fn($q) => $q->whereIn('location_id', $authLocIds))
-                ->where(function ($q) use ($today) {
-                    $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
+                ->where(function ($q) use ($today, $rawNextDate) {
                     $q->whereRaw("$rawNextDate <= ?", [$today]);
                 })
                 ->whereDoesntHave('services', function ($q) {
                     $q->whereNull('date_out');
                 })->count(),
+
             'upcoming' => Item::where('is_active', true)
                 ->where('service_required', true)
+                ->where('condition', '!=', 'perbaikan')
                 ->whereNotNull('service_interval_days')
                 ->when(!empty($authLocIds), fn($q) => $q->whereIn('location_id', $authLocIds))
-                ->where(function ($q) use ($today, $upcomingFilter) {
-                    $rawNextDate = "date(COALESCE(last_service_date, acquisition_date), '+' || service_interval_days || ' days')";
+                ->where(function ($q) use ($today, $rawNextDate) {
                     $q->whereRaw("$rawNextDate > ?", [$today]);
-                    
-                    if ($upcomingFilter == '1_week') {
-                        $limitDate = date('Y-m-d', strtotime('+7 days'));
-                        $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
-                    } elseif ($upcomingFilter == '30_days') {
-                        $limitDate = date('Y-m-d', strtotime('+30 days'));
-                        $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
-                    } elseif ($upcomingFilter == '2_months') {
-                        $limitDate = date('Y-m-d', strtotime('+60 days'));
-                        $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
-                    }
+                    $limitDate = date('Y-m-d', strtotime('+30 days')); // Default limit for count
+                    $q->whereRaw("$rawNextDate <= ?", [$limitDate]);
                 })
                 ->whereDoesntHave('services', function ($q) {
                     $q->whereNull('date_out');

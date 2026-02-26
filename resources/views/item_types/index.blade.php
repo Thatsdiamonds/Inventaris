@@ -4,7 +4,10 @@
     <div class="page-header flex-between mb-3">
         <div>
             <h1 class="mb-0">Katalog Nama Aset</h1>
-            <p class="text-secondary">Kelola standar penamaan dan kode unik barang</p>
+            <p class="text-secondary">Kelola standar penamaan dan kode unik barang @if (request('search'))
+                    (Ditemukan: {{ $itemTypes->total() }})
+                @endif
+            </p>
         </div>
         <a href="{{ route('item-types.create') }}" wire:navigate class="btn btn-primary btn-sm">
             <svg class="icon icon-sm">

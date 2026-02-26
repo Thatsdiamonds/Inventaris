@@ -53,7 +53,7 @@ class UpdateItemUqcodesJob implements ShouldQueue
             $query->chunk(100, function ($items) use ($task) {
                 foreach ($items as $item) {
                     $parts = explode('.', $item->uqcode);
-                    if (count($parts) === 4) {
+                    if (count($parts) >= 4) {
                         $oldUqcode = $item->uqcode;
                         
                         if ($this->type === 'category') {

@@ -71,7 +71,7 @@
                         </td>
                         <td>
                             @if ($u->isRoot())
-                                <span class="text-muted" style="font-style: italic;">Full System Access</span>
+                                <span class="text-muted" style="font-style: italic;">Akses tertinggi</span>
                             @elseif($u->assignedRole)
                                 <span class="badge badge-accent">{{ $u->assignedRole->name }}</span>
                             @else
@@ -100,7 +100,7 @@
                                     </form>
                                 </div>
                             @else
-                                <span class="text-muted" style="font-size: 0.8rem;">(System Locked)</span>
+                                <span class="text-muted" style="font-size: 0.8rem;">(Dikunci sistem)</span>
                             @endif
                         </td>
                     </tr>

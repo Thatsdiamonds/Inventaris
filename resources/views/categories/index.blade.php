@@ -4,7 +4,10 @@
     <div class="page-header flex-between mb-3">
         <div>
             <h1 class="mb-0">Daftar Kategori</h1>
-            <p class="text-secondary">Kelola pengelompokan barang inventaris</p>
+            <p class="text-secondary">Kelola pengelompokan barang inventaris @if (request('search'))
+                    (Ditemukan: {{ $categories->total() }})
+                @endif
+            </p>
         </div>
         <a href="{{ route('categories.create') }}" wire:navigate class="btn btn-primary btn-sm">
             <svg class="icon icon-sm">
@@ -53,6 +56,7 @@
                 <tr>
                     <th>Nama Kategori</th>
                     <th>Kode Unik</th>
+                    <th style="text-align: center;">Total Barang</th>
                     <th>Deskripsi</th>
                     <th style="width: 150px; text-align: right;">Aksi</th>
                 </tr>
@@ -66,6 +70,15 @@
                         <td>
                             <code
                                 style="background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: 4px;">{{ $category->unique_code }}</code>
+                        </td>
+                        <td style="text-align: center;">
+                            @if ($category->items_count > 0)
+                                <span class="badge badge-success" style="font-size: 0.8rem; padding: 2px 8px;">
+                                    {{ $category->items_count }}
+                                </span>
+                            @else
+                                <span class="text-muted" style="font-size: 0.8rem;">0</span>
+                            @endif
                         </td>
                         <td class="text-muted" style="font-size: 0.85rem;">{{ $category->description ?: '-' }}</td>
                         <td style="text-align: right;">

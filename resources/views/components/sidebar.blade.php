@@ -13,7 +13,7 @@
             </div>
         @endif
         <div class="sidebar-brand {{ !($setting && $setting->church_photo_path) ? 'no-photo' : '' }}">
-            <h2 class="brand-text">{{ substr($appName, 0, 25) }}</h2>
+            <h2 class="brand-text">{{ $appName }}</h2>
         </div>
     </div>
 
@@ -154,14 +154,9 @@
     </nav>
 
     <div class="sidebar-footer">
-        <div class="user-profile">
-            <div class="avatar">
-                {{ substr(auth()->user()->name, 0, 1) }}
-            </div>
-            <div class="user-info">
-                <div class="name">{{ auth()->user()->name }}</div>
-                <div class="role">{{ auth()->user()->assignedRole->name ?? 'Staff' }}</div>
-            </div>
+        <div class="user-info">
+            <div class="name">{{ auth()->user()->name }}</div>
+            <div class="role">{{ auth()->user()->assignedRole->name ?? 'Staff' }}</div>
         </div>
         <div class="footer-actions">
             <a href="{{ route('profile.show') }}" title="Profil Saya" class="action-btn">
@@ -214,9 +209,10 @@
         font-weight: 700;
         color: var(--c-primary);
         margin: 0;
-        white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;      /* maksimal 2 baris */
+        -webkit-box-orient: vertical;
     }
 
     .sidebar-nav {
@@ -286,14 +282,6 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-    }
-
-    .user-profile {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        flex: 1;
-        overflow: hidden;
     }
 
     .avatar {

@@ -24,9 +24,9 @@
         </label>
     </div>
     <div id="edit_cat_manual_code_section" style="display: none;">
-        <label>Unique Code (4-16 chars):</label>
+        <label>Unique Code (2-6 chars):</label>
         <input type="text" name="unique_code" id="edit_cat_unique_code" value="{{ $category->unique_code }}"
-            minlength="4" maxlength="16">
+            minlength="2" maxlength="6">
     </div>
     <div id="edit_cat_warning"
         style="display: none; background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px solid #ffeeba; font-size: 0.9em;">
@@ -121,7 +121,7 @@
                     return w[0].toUpperCase() + w.slice(1).toLowerCase();
                 })
                 .replace(/\s/g, '');
-            document.getElementById('edit_cat_unique_code').value = sanitized;
+            document.getElementById('edit_cat_unique_code').value = sanitized.substring(0, 6);
         }
         checkCatCodeChange();
     }
@@ -144,7 +144,7 @@
     function checkCatCodeChange() {
         const currentCode = document.getElementById('edit_cat_unique_code').value;
         const warning = document.getElementById('edit_cat_warning');
-        if (itemCount > 0 && currentCode !== originalCatCode && currentCode.length >= 4) {
+        if (itemCount > 0 && currentCode !== originalCatCode && currentCode.length >= 2) {
             warning.style.display = 'block';
         } else {
             warning.style.display = 'none';

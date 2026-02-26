@@ -36,9 +36,9 @@
             </div>
 
             <div class="form-group">
-                <label>Kode Unik (4-16 karakter) <span style="color: var(--color-danger);">*</span></label>
+                <label>Kode Unik (2-6 karakter) <span style="color: var(--color-danger);">*</span></label>
                 <input type="text" name="unique_code" id="unique_code"
-                    value="{{ old('unique_code', $location->unique_code) }}" minlength="4" maxlength="16" required
+                    value="{{ old('unique_code', $location->unique_code) }}" minlength="2" maxlength="6" required
                     oninput="checkCodeChange()">
 
                 <div id="code_warning" class="alert alert-warning py-3 mt-3 mb-0"
@@ -151,7 +151,7 @@
                         return w[0].toUpperCase() + w.slice(1).toLowerCase();
                     })
                     .replace(/\s/g, '');
-                document.getElementById('unique_code').value = sanitized;
+                document.getElementById('unique_code').value = sanitized.substring(0, 6);
             }
             checkCodeChange();
         }
@@ -173,7 +173,7 @@
         function checkCodeChange() {
             const currentCode = document.getElementById('unique_code').value;
             const warning = document.getElementById('code_warning');
-            if (itemCount > 0 && currentCode !== originalCode && currentCode.length >= 4) {
+            if (itemCount > 0 && currentCode !== originalCode && currentCode.length >= 2) {
                 warning.style.display = 'block';
             } else {
                 warning.style.display = 'none';

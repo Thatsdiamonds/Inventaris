@@ -14,7 +14,6 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Optimize data retrieval for filters (Cache for 60 minutes)
         $categories = \Illuminate\Support\Facades\Cache::remember('categories_all', 60 * 60, function () {
             return Category::all();
         });
@@ -31,7 +30,6 @@ class ItemController extends Controller
             $query->where('is_active', true);
         }
 
-        // Location-based Access Check
         $user = auth()->user();
         if (! $user->isRoot()) {
             $authorizedLocations = $user->authorizedLocations();
@@ -42,10 +40,14 @@ class ItemController extends Controller
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
+                // Optimize search: group name/code prefix searches first
                 $q->where('name', 'LIKE', "%$search%")
+                    ->orWhere('uqcode', 'LIKE', "$search%") // Start matches are faster
                     ->orWhere('uqcode', 'LIKE', "%$search%")
-                    ->orWhere('condition', 'LIKE', "%$search%")
-                    ->orWhereHas('category', function ($cq) use ($search) {
+                    ->orWhere('condition', 'LIKE', "$search%");
+                
+                // Keep WhereHas but be mindful of performance on large datasets
+                $q->orWhereHas('category', function ($cq) use ($search) {
                         $cq->where('name', 'LIKE', "%$search%");
                     })
                     ->orWhereHas('location', function ($lq) use ($search) {
@@ -102,22 +104,9 @@ class ItemController extends Controller
         }
 
         $setting = \App\Models\Setting::first();
-        $defaultPagination = $setting->default_pagination ?? 15;
+        $perPage = $request->input('per_page', $setting->default_pagination ?? 15);
+        $items = $query->paginate($perPage)->withQueryString();
 
-        $perPage = $request->input('per_page', $defaultPagination);
-        $enablePagination = $request->input('pagination', 'on') === 'on';
-
-        if ($enablePagination) {
-            $items = $query->paginate($perPage)->withQueryString();
-        } else {
-            $items = $query->get();
-            if ($items->count() > 50) {
-                session()->flash('warning', 'Peringatan: Menampilkan data dalam jumlah besar tanpa pagination dapat menurunkan performa. Sangat direkomendasikan untuk mengaktifkan kembali pagination.');
-            }
-        }
-
-        // $categories and $locations are already loaded and cached above
-        // Filter locations based on user permissions if needed
         $displayLocations = $locations;
         if (! $user->isRoot()) {
             $authLocs = $user->authorizedLocations();
@@ -130,7 +119,6 @@ class ItemController extends Controller
             'items' => $items,
             'categories' => $categories,
             'locations' => $displayLocations,
-            'enablePagination' => $enablePagination,
         ]);
     }
 
@@ -168,24 +156,26 @@ class ItemController extends Controller
         return strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $itemName));
     }
 
-    private function generateUqcode($locationId, $categoryId, $acquisitionDate, $itemName)
+    private function generateUqcode($locationId, $categoryId, $acquisitionDate, $itemName, &$cachedCount = null)
     {
         $location = Location::findOrFail($locationId);
         $category = Category::findOrFail($categoryId);
         $year = \Carbon\Carbon::parse($acquisitionDate)->format('Y');
-
         $nameCode = $this->getNameCode($itemName);
 
-        // Count items with same Location, Category AND Name Code
-        // We use the generated uqcode prefix to find similar items
         $prefix = sprintf('%s.%s.%s.', $location->unique_code, $category->unique_code, $nameCode);
-        $count = Item::where('uqcode', 'LIKE', $prefix.'%')->count() + 1;
-
+        
+        if ($cachedCount === null) {
+            $cachedCount = Item::where('uqcode', 'LIKE', $prefix.'%')->count();
+        }
+        
+        $count = ++$cachedCount;
         $serial = str_pad($count, 3, '0', STR_PAD_LEFT);
         $uqcode = sprintf('%s%s.%s', $prefix, $serial, $year);
 
+        // Rare collision check
         while (Item::where('uqcode', $uqcode)->exists()) {
-            $count++;
+            $count = ++$cachedCount;
             $serial = str_pad($count, 3, '0', STR_PAD_LEFT);
             $uqcode = sprintf('%s%s.%s', $prefix, $serial, $year);
         }
@@ -208,27 +198,19 @@ class ItemController extends Controller
             'quantity'             => 'nullable|integer|min:1|max:100',
         ]);
 
-        // Resolve group from group_id or name
         if (!empty($validated['group_id'])) {
             $group = ItemType::find($validated['group_id']);
             if ($group) {
                 $validated['name'] = $group->name;
             }
         } else {
-            // Try to find or create group by name
             $group = ItemType::where('name', $validated['name'])->first();
             if ($group) {
                 $validated['group_id'] = $group->id;
             }
         }
 
-        $quantity = $request->input('quantity', 1);
-        $createdItems = [];
-        $firstUqcode = null;
-
-        // Handle photo upload once if possible, or copy per item?
-        // Since we are creating multiple records, we should probably upload once and reuse the path
-        // BUT standard implementation would likely be one photo file for all identical items if they are physically identical types.
+        $quantity = (int) $request->input('quantity', 1);
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $imageService = app(ImageOptimizationService::class);
@@ -241,60 +223,58 @@ class ItemController extends Controller
 
         $validated['service_required'] = $request->has('service_required');
         $validated['is_active'] = true;
+        $validated['last_service_date'] = $validated['service_required'] ? $validated['acquisition_date'] : null;
+        $validated['photo_path'] = $photoPath;
 
-        if ($validated['service_required']) {
-            $validated['last_service_date'] = $validated['acquisition_date'];
-        }
+        unset($validated['photo'], $validated['quantity']);
 
-        // Remove photo and quantity from validated data for the loop
-        unset($validated['photo']);
-        unset($validated['quantity']);
+        $createdItems = [];
+        $firstUqcode = null;
+        $serialTracker = null; // Pass by reference for efficiency
 
-        // Add photo path if it exists
-        if ($photoPath) {
-            $validated['photo_path'] = $photoPath;
-        }
+        // Database Transaction for safety and performance
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            for ($i = 0; $i < $quantity; $i++) {
+                $code = $this->generateUqcode(
+                    $validated['location_id'],
+                    $validated['category_id'],
+                    $validated['acquisition_date'],
+                    $validated['name'],
+                    $serialTracker
+                );
 
-        for ($i = 0; $i < $quantity; $i++) {
-            // Generate UQ Code for each item (serial will increment)
-            $code = $this->generateUqcode(
-                $validated['location_id'],
-                $validated['category_id'],
-                $validated['acquisition_date'],
-                $validated['name']
-            );
-
-            $itemData = $validated;
-            $itemData['uqcode'] = $code;
-
-            $item = Item::create($itemData);
-            $createdItems[] = $item->id;
-
-            if ($i === 0) {
-                $firstUqcode = $code;
+                $item = Item::create(array_merge($validated, ['uqcode' => $code]));
+                $createdItems[] = $item->id;
+                if ($i === 0) $firstUqcode = $code;
             }
+            \Illuminate\Support\Facades\DB::commit();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return back()->with('error', 'Gagal menyimpan data barang: ' . $e->getMessage());
         }
 
-        if ($request->input('auto_qr') == '1' && count($createdItems) > 0) {
-            $format = count($createdItems) > 1 ? 'zip' : 'img';
-            $msg = $quantity > 1
-                ? "$quantity Barang berhasil ditambahkan. Unduhan QR ($format) akan segera dimulai."
-                : 'Barang berhasil ditambahkan. Unduhan QR akan segera dimulai.';
+        if ($request->input('auto_print') == '1') {
+            return redirect()->route('qr.generate', [
+                'item_ids' => $createdItems,
+                'format' => 'html_print',
+                'auto_print' => 1,
+                'redirect_url' => route('items.index')
+            ]);
+        }
 
+        if ($request->input('auto_qr') == '1') {
             return redirect()->route('items.index')
-                ->with('success', $msg)
+                ->with('success', 'Barang berhasil ditambahkan. Unduhan QR akan segera dimulai.')
                 ->with('trigger_download_qr', [
                     'item_ids' => $createdItems,
-                    'format' => $format,
+                    'format' => $quantity > 1 ? 'zip' : 'img',
                 ]);
         }
 
-        $msg = $quantity > 1
-            ? "$quantity Barang berhasil ditambahkan. Kode awal: $firstUqcode"
-            : "Barang berhasil ditambahkan. Kode: $firstUqcode";
-
-        return redirect()->route('items.index')->with('success', $msg);
+        return redirect()->route('items.index')->with('success', "$quantity Barang berhasil ditambahkan. Kode awal: $firstUqcode");
     }
+
 
     public function quickQr(Item $item)
     {

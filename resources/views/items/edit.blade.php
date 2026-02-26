@@ -654,6 +654,7 @@
                     if (id) body.append('id', id);
                     body.append('name', name);
                     body.append('unique_code', code);
+                    body.append('redirect_url', window.location.href);
 
                     const res = await fetch('{{ route('api.item-types.save') }}', {
                         method: 'POST',
@@ -662,6 +663,10 @@
                     const data = await res.json();
 
                     if (data.success) {
+                        if (data.requires_sync) {
+                            window.location.href = data.sync_url;
+                            return;
+                        }
                         showModalAlert('Grup berhasil disimpan.', 'success');
                         cancelModalEdit();
                         loadGroups();

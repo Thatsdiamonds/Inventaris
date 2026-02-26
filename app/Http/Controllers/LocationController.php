@@ -9,7 +9,7 @@ class LocationController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Location::orderBy('name');
+        $query = Location::withCount('items')->orderBy('name');
 
         if ($search = $request->input('search')) {
             $query->where('name', 'LIKE', "%$search%")
@@ -79,7 +79,7 @@ class LocationController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string',
-            'unique_code' => 'required|string|min:4|max:16|unique:locations,unique_code,' . $location->id,
+            'unique_code' => 'required|string|min:2|max:6|unique:locations,unique_code,' . $location->id,
             'description' => 'nullable|string',
         ]);
 
@@ -88,51 +88,17 @@ class LocationController extends Controller
         // Cascade update items if unique_code changed
         if ($oldCode !== $location->unique_code) {
             $excludedItems = $request->input('excluded_items', []);
-            $itemsQuery = \App\Models\Item::where('location_id', $location->id);
             
-            if (!empty($excludedItems)) {
-                $itemsQuery->whereNotIn('id', $excludedItems);
-            }
+            \Illuminate\Support\Facades\Cache::forget('locations_all');
 
-            $count = $itemsQuery->count();
-
-            if ($count > 0) {
-                if ($count > 50) {
-                    // Background process
-                    $task = \App\Models\BackgroundTask::create([
-                        'name' => 'Update UQCode Lokasi: ' . $location->name . ' (Partial)',
-                        'total_items' => $count,
-                        'status' => 'pending'
-                    ]);
-
-                    if (!empty($excludedItems)) {
-                         \App\Jobs\UpdateItemUqcodesJob::dispatch('location', $location->id, $location->unique_code, $task->id, $excludedItems);
-                    } else {
-                         \App\Jobs\UpdateItemUqcodesJob::dispatch('location', $location->id, $location->unique_code, $task->id);
-                    }
-
-                    return redirect()->route('locations.index')
-                        ->with('success', 'Pembaruan kode unik lokasi sedang diproses di latar belakang untuk ' . $count . ' barang.');
-                } else {
-                    // Synchronous process
-                    $items = $itemsQuery->get();
-                    foreach ($items as $item) {
-                        $parts = explode('.', $item->uqcode);
-                        if (count($parts) === 4) {
-                            $oldUqcode = $item->uqcode;
-                            $parts[0] = $location->unique_code; 
-                            $newUqcode = implode('.', $parts);
-                            $item->update(['uqcode' => $newUqcode]);
-                            \App\Models\ItemHistory::create([
-                                'item_id' => $item->id,
-                                'old_uqcode' => $oldUqcode,
-                                'new_uqcode' => $newUqcode,
-                                'reason' => 'Location unique_code changed (Synchronous Partial)',
-                            ]);
-                        }
-                    }
-                }
-            }
+            return redirect()->route('items.process_update', [
+                'type' => 'location',
+                'id' => $location->id,
+                'old_code' => $oldCode,
+                'new_code' => $location->unique_code,
+                'excluded_items' => $excludedItems,
+                'redirect_url' => route('locations.index')
+            ]);
         }
 
         \Illuminate\Support\Facades\Cache::forget('locations_all');

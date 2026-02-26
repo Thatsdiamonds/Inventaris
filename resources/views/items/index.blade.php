@@ -4,7 +4,9 @@
     <div class="page-header">
         <div>
             <h1 class="mb-1">Inventaris Aset</h1>
-            <p class="text-secondary text-sm">Total: {{ $items->total() ?? $items->count() }} unit aset terdaftar</p>
+            <p class="text-secondary text-sm">Total: {{ $items->total() }} unit aset @if (request('search') || request('location_id') || request('category_id'))
+                    (Ditemukan: {{ $items->total() }})
+                @endif terdaftar</p>
         </div>
         <a href="{{ route('items.create') }}" wire:navigate class="btn btn-primary">
             <svg class="icon icon-sm">
@@ -151,6 +153,7 @@
                             <code class="text-primary font-bold text-sm block mb-1">
                                 {{ $item->uqcode }}
                             </code>
+                            <br>
                             <span class="text-xs text-muted">ID: {{ $item->id }}</span>
                         </td>
                         <td>
@@ -211,6 +214,13 @@
                         </td>
                         <td class="text-right">
                             <div class="flex-end gap-1">
+                                <button type="button" class="btn btn-ghost btn-sm" title="Tambah ke Antrian Cetak"
+                                    onclick="addToLabelQueue({{ $item->id }})">
+                                    <svg class="icon icon-sm text-primary">
+                                        <use href="#icon-print"></use>
+                                    </svg>
+                                </button>
+
                                 <a href="{{ route('items.quick_qr', $item->id) }}" class="btn btn-ghost btn-sm"
                                     title="Unduh QR">
                                     <svg class="icon icon-sm">
@@ -319,4 +329,104 @@
             })();
         @endif
     </script>
+
+    <script>
+        // ====== CROSS-TAB LABEL QUEUE SYSTEM ======
+        const CHANNEL_NAME = 'label-print-queue';
+        let channel = new BroadcastChannel(CHANNEL_NAME);
+        let queueTabOpen = false;
+        let pendingItemId = null;
+
+        // Listen for pong from queue tab
+        channel.onmessage = (event) => {
+            if (event.data.action === 'pong') {
+                queueTabOpen = true;
+
+                // If there was a pending item to add, send it now
+                if (pendingItemId) {
+                    channel.postMessage({
+                        action: 'add',
+                        itemId: pendingItemId
+                    });
+                    showQueueToast(pendingItemId);
+                    pendingItemId = null;
+                }
+            }
+        };
+
+        function addToLabelQueue(itemId) {
+            // First, ping to check if queue tab is alive
+            queueTabOpen = false;
+            channel.postMessage({
+                action: 'ping'
+            });
+
+            // Wait briefly for pong response
+            setTimeout(() => {
+                if (queueTabOpen) {
+                    // Tab is open, send directly
+                    channel.postMessage({
+                        action: 'add',
+                        itemId: itemId
+                    });
+                    showQueueToast(itemId);
+                } else {
+                    // Tab is not open, open it and queue the item
+                    pendingItemId = itemId;
+                    window.open('{{ route('qr.print_images') }}', '_blank');
+
+                    // Wait for the new tab to initialize and respond
+                    setTimeout(() => {
+                        if (pendingItemId) {
+                            channel.postMessage({
+                                action: 'add',
+                                itemId: pendingItemId
+                            });
+                            showQueueToast(pendingItemId);
+                            pendingItemId = null;
+                        }
+                    }, 2000);
+                }
+            }, 500);
+        }
+
+        function showQueueToast(itemId) {
+            // Remove existing toast
+            const existing = document.getElementById('queue-toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'queue-toast';
+            toast.style.cssText = `
+                position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+                padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;
+                color: white; background: #2563eb;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideUp 0.3s ease;
+                transition: opacity 0.3s;
+            `;
+            toast.innerHTML =
+                `Label ditambahkan ke antrian cetak`;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+
+    <style>
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
 @endsection

@@ -15,10 +15,14 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('items/process-update', [App\Http\Controllers\ProcessUpdateController::class, 'index'])->name('items.process_update');
+    Route::post('items/process-update/step', [App\Http\Controllers\ProcessUpdateController::class, 'step'])->name('items.process_update.step');
+    Route::post('items/process-update/check', [App\Http\Controllers\ProcessUpdateController::class, 'check'])->name('items.process_update.check');
+
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
 
     Route::middleware(['permission:access_reports'])->group(function () {
-        Route::get('/reports', [ReportController::class, 'menu'])->name('reports.menu');
+        Route::match(['get', 'post'], '/reports', [ReportController::class, 'menu'])->name('reports.menu');
         
         // Inventory Reports
         Route::post('/reports/inventory', [ReportController::class, 'generate'])->name('reports.inventory.generate');
@@ -57,48 +61,48 @@ Route::middleware(['auth'])->group(function () {
         }
 
         $itemQuery = \App\Models\Item::query();
-        $serviceQuery = \App\Models\Service::query();
-
         if (! empty($authLocIds)) {
             $itemQuery->whereIn('location_id', $authLocIds);
+        }
+
+        // Consolidated optimized query for main stats
+        $stats = (clone $itemQuery)->selectRaw("
+            COUNT(*) as total_items,
+            SUM(CASE WHEN condition = 'dimusnahkan' THEN 1 ELSE 0 END) as total_dimusnahkan,
+            SUM(CASE WHEN condition = 'perbaikan' THEN 1 ELSE 0 END) as total_perbaikan,
+            SUM(CASE WHEN is_active = 1 AND service_required = 1 AND condition != 'perbaikan' AND $rawNextDate < '$today' THEN 1 ELSE 0 END) as overdue_count,
+            SUM(CASE WHEN is_active = 1 AND service_required = 1 AND condition != 'perbaikan' AND $rawNextDate >= '$today' THEN 1 ELSE 0 END) as upcoming_count
+        ")->first();
+
+        $serviceQuery = \App\Models\Service::query();
+        if (! empty($authLocIds)) {
             $serviceQuery->whereHas('item', function ($q) use ($authLocIds) {
                 $q->whereIn('location_id', $authLocIds);
             });
         }
 
         $data = [
-            'total_items' => (clone $itemQuery)->count(),
+            'total_items' => $stats->total_items,
             'total_categories' => \App\Models\Category::count(),
             'total_locations' => ! empty($authLocIds) ? count($authLocIds) : \App\Models\Location::count(),
-            'total_dimusnahkan' => (clone $itemQuery)->where('condition', 'dimusnahkan')->count(),
-            'total_perbaikan' => (clone $itemQuery)->where('condition', 'perbaikan')->count(),
-
-            // Terlambat
-            'overdue_count' => (clone $itemQuery)->where('is_active', true)
-                ->where('service_required', true)
-                ->where('condition', '!=', 'perbaikan')
-                ->whereRaw("$rawNextDate < ?", [$today])
-                ->count(),
+            'total_dimusnahkan' => $stats->total_dimusnahkan,
+            'total_perbaikan' => $stats->total_perbaikan,
+            'overdue_count' => $stats->overdue_count,
+            'upcoming_count' => $stats->upcoming_count,
+            'in_service_count' => (clone $serviceQuery)->whereNull('date_out')->count(),
+            
             'overdue_latest' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
                 ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate < ?", [$today])
                 ->latest()->first(),
-
-            // Akan datang
-            'upcoming_count' => (clone $itemQuery)->where('is_active', true)
-                ->where('service_required', true)
-                ->where('condition', '!=', 'perbaikan')
-                ->whereRaw("$rawNextDate >= ?", [$today])
-                ->count(),
+            
             'upcoming_latest' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
                 ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate >= ?", [$today])
                 ->latest()->first(),
 
-            // Dalam Servis
-            'in_service_count' => (clone $serviceQuery)->whereNull('date_out')->count(),
             'in_service_latest' => (clone $serviceQuery)->with('item')->whereNull('date_out')->latest()->first(),
         ];
 
@@ -117,6 +121,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('api/items/next-serial', [ItemController::class, 'getNextSerial'])->name('api.items.next-serial');
         Route::get('api/items/search-names', [ItemController::class, 'searchNames'])->name('api.items.search-names');
         Route::get('qr', [App\Http\Controllers\QrController::class, 'index'])->name('qr.index');
+        Route::get('qr/print-images', [App\Http\Controllers\QrController::class, 'printImages'])->name('qr.print_images');
+        Route::get('qr/label-image/{item}', [App\Http\Controllers\QrController::class, 'labelImageJson'])->name('qr.label_image_json');
         Route::match(['get', 'post'], 'qr/generate', [App\Http\Controllers\QrController::class, 'generate'])->name('qr.generate');
         Route::post('qr/download-file', [App\Http\Controllers\QrController::class, 'downloadFile'])->name('qr.download_file');
     });
