@@ -21,17 +21,21 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
 
-    Route::middleware(['permission:access_reports'])->group(function () {
+Route::middleware(['permission:access_reports'])->group(function () {
         Route::match(['get', 'post'], '/reports', [ReportController::class, 'menu'])->name('reports.menu');
-        
+        Route::get('/reports/inventory/export-excel', [ReportController::class, 'exportInventoryExcel'])
+    ->name('reports.inventory.export_excel');
+        Route::get('/reports/services/export-excel', [ReportController::class, 'exportServiceExcel'])
+    ->name('reports.services.export_excel');
+
         // Inventory Reports
         Route::post('/reports/inventory', [ReportController::class, 'generate'])->name('reports.inventory.generate');
-        Route::post('/reports/inventory/download', [ReportController::class, 'downloadInventory'])->name('reports.inventory.download_file');
-        
+
+
         // Service Reports
         Route::post('/reports/services', [ReportController::class, 'generate'])->name('reports.services.generate')->defaults('type', 'services');
-        Route::post('/reports/services/download', [ReportController::class, 'downloadServices'])->name('reports.services.download_file');
-        
+      
+
         // Live Preview
         Route::post('/reports/preview', [ReportController::class, 'preview'])->name('reports.preview');
 
@@ -90,13 +94,13 @@ Route::middleware(['auth'])->group(function () {
             'overdue_count' => $stats->overdue_count,
             'upcoming_count' => $stats->upcoming_count,
             'in_service_count' => (clone $serviceQuery)->whereNull('date_out')->count(),
-            
+
             'overdue_latest' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
                 ->where('condition', '!=', 'perbaikan')
                 ->whereRaw("$rawNextDate < ?", [$today])
                 ->latest()->first(),
-            
+
             'upcoming_latest' => (clone $itemQuery)->where('is_active', true)
                 ->where('service_required', true)
                 ->where('condition', '!=', 'perbaikan')

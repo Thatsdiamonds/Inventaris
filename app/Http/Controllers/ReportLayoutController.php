@@ -20,13 +20,17 @@ class ReportLayoutController extends Controller
 
         $availableFields = [
             'inventory' => [
-                ['key' => 'uqcode', 'label' => 'Kode Barang'],
-                ['key' => 'name', 'label' => 'Nama Barang'],
-                ['key' => 'category.name', 'label' => 'Kategori'],
-                ['key' => 'location.name', 'label' => 'Lokasi'],
-                ['key' => 'condition', 'label' => 'Kondisi'],
-                ['key' => 'last_service_date', 'label' => 'Terakhir Servis'],
-            ],
+    ['key' => 'uqcode', 'label' => 'Kode Barang'],
+    ['key' => 'name', 'label' => 'Nama Barang'],
+    ['key' => 'category.name', 'label' => 'Kategori'],
+    ['key' => 'location.name', 'label' => 'Lokasi'],
+    ['key' => 'condition', 'label' => 'Kondisi'],
+
+    ['key' => 'acquisition_date', 'label' => 'Tanggal Perolehan'],
+    ['key' => 'created_at', 'label' => 'Tanggal Inventarisasi'],
+    ['key' => 'service_interval_days', 'label' => 'Maintenance (Hari)'],
+    ['key' => 'last_service_date', 'label' => 'Terakhir Servis'],
+],
             'qr' => [
                 ['key' => 'church_name', 'label' => 'Nama Gereja'],
                 ['key' => 'location.name', 'label' => 'Ruang / Lokasi'],

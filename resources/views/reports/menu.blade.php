@@ -10,13 +10,13 @@
 
     <!-- Tab Navigation -->
     <div class="card mb-4 p-1" style="display: inline-flex; background: var(--color-bg-secondary); border-radius: 12px;">
-        <button class="btn btn-tab active" onclick="switchTab('inventory')">
+        <button class="btn btn-tab active" onclick="switchTab(event, 'inventory')">
             <svg class="icon icon-sm mr-2">
                 <use href="#icon-inventory"></use>
             </svg>
             Laporan Inventaris
         </button>
-        <button class="btn btn-tab" onclick="switchTab('services')">
+       <button class="btn btn-tab" onclick="switchTab(event, 'services')">
             <svg class="icon icon-sm mr-2">
                 <use href="#icon-service"></use>
             </svg>
@@ -28,8 +28,8 @@
 
         <!-- SIDEBAR FILTERS -->
         <div class="card card-sticky">
-            <form id="reportForm" method="POST" action="{{ route('reports.inventory.generate') }}">
-                @csrf
+           <form id="reportForm" method="POST" action="{{ route('reports.inventory.generate') }}">
+            @csrf
 
                 <!-- INVENTORY FILTERS -->
                 <div id="filter-inventory">
@@ -126,7 +126,7 @@
                         <svg class="icon icon-sm mr-2">
                             <use href="#icon-report"></use>
                         </svg>
-                        Export PDF
+                        Export Excel
                     </button>
                     <a href="{{ route('reports.layout.edit', 'inventory') }}" id="layoutBtn"
                         class="btn btn-ghost btn-sm w-full">
@@ -157,7 +157,7 @@
             <div class="mt-4 p-4"
                 style="background: var(--color-bg-secondary); border-radius: 8px; border: 1px dashed var(--color-border);">
                 <small class="text-secondary">
-                    * Preview hanya menampilkan data terbatas untuk kecepatan. Gunakan tombol <strong>Export PDF</strong>
+                    * Preview hanya menampilkan data terbatas untuk kecepatan. Gunakan tombol <strong>Export Excel</strong>
                     untuk mengunduh laporan lengkap sesuai kriteria di samping.
                 </small>
             </div>
@@ -271,13 +271,13 @@
 
     <script>
         let currentTab = 'inventory';
+        let previewTimeout;
 
-        function switchTab(tab) {
+        function switchTab(e, tab) {
             currentTab = tab;
 
-            // UI Toggle
             document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            e.currentTarget.classList.add('active');
 
             document.getElementById('filter-inventory').style.display = tab === 'inventory' ? 'block' : 'none';
             document.getElementById('filter-services').style.display = tab === 'services' ? 'block' : 'none';
@@ -285,8 +285,9 @@
 
             // Update Form Action
             const form = document.getElementById('reportForm');
-            form.action = tab === 'inventory' ? "{{ route('reports.inventory.generate') }}" :
-                "{{ route('reports.services.generate') }}";
+          form.action = tab === 'inventory'
+    ? "{{ route('reports.inventory.generate') }}"
+    : "{{ route('reports.services.generate') }}";
 
             updatePreview();
         }
@@ -298,31 +299,41 @@
             updatePreview();
         }
 
-        async function updatePreview() {
-            const container = document.getElementById('preview-container');
-            const loader = document.getElementById('preview-loader');
-            const form = document.getElementById('reportForm');
-            const formData = new FormData(form);
-            formData.append('type', currentTab);
+        function updatePreview() {
+    clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(runPreview, 400);
+}
+async function runPreview() {
+    const container = document.getElementById('preview-container');
+    const loader = document.getElementById('preview-loader');
+    const form = document.getElementById('reportForm');
+    const formData = new FormData(form);
+    formData.append('type', currentTab);
 
-            loader.style.display = 'block';
+    loader.style.display = 'block';
 
-            try {
-                const response = await fetch("{{ route('reports.preview') }}", {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRF-TOKEN': "{{ csrf_token() }}"
-                    }
-                });
-                const data = await response.json();
-                container.innerHTML = data.html;
-            } catch (error) {
-                console.error('Preview error:', error);
-            } finally {
-                loader.style.display = 'none';
+    try {
+        const response = await fetch("{{ route('reports.preview') }}", {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRF-TOKEN': "{{ csrf_token() }}"
             }
-        }
+        });
+
+        const data = await response.json();
+        container.innerHTML = data.html;
+
+    } catch (error) {
+        container.innerHTML = `
+            <div class="text-center py-5 text-danger">
+                Gagal memuat preview.
+            </div>
+        `;
+    } finally {
+        loader.style.display = 'none';
+    }
+}
 
         function setRange(days) {
             const end = new Date();
@@ -340,8 +351,8 @@
         }
 
         // Init
-        document.addEventListener('DOMContentLoaded', () => {
-            switchTab('inventory');
-        });
+       document.addEventListener('DOMContentLoaded', () => {
+    updatePreview();
+});
     </script>
 @endsection

@@ -31,8 +31,6 @@
             <input id="password" type="password" name="password" required autocomplete="current-password">
         </div>
 
-
-
         <div>
             <button type="submit">
                 Login
@@ -40,5 +38,4 @@
         </div>
     </form>
 </body>
-
 </html>

@@ -67,35 +67,41 @@
         <p>{{ $message ?? 'Laporan Anda sedang dibuat. Unduhan akan dimulai secara otomatis dalam beberapa detik.' }}
         </p>
 
-        <form id="downloadForm" action="{{ $downloadUrl }}" method="{{ $method ?? 'POST' }}" style="display: none;">
-            @csrf
-            @if (isset($params))
-                @foreach ($params as $key => $value)
-                    @if (is_array($value))
-                        @foreach ($value as $v)
-                            <input type="hidden" name="{{ $key }}[]" value="{{ $v }}">
-                        @endforeach
-                    @else
-                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
-                    @endif
+        <iframe name="downloadFrame" style="display:none;"></iframe>
+
+    <form id="downloadForm"
+      action="{{ $downloadUrl }}"
+      method="GET"
+      target="downloadFrame"
+      style="display:none;">
+
+    @if (isset($params))
+        @foreach ($params as $key => $value)
+            @if (is_array($value))
+                @foreach ($value as $v)
+                    <input type="hidden" name="{{ $key }}[]" value="{{ $v }}">
                 @endforeach
+            @else
+                <input type="hidden" name="{{ $key }}" value="{{ $value }}">
             @endif
-        </form>
+        @endforeach
+    @endif
+</form>
     </div>
 
     <script>
-        window.onload = function() {
-            // Short delay to show the nice UI
-            setTimeout(() => {
-                document.getElementById('downloadForm').submit();
+    window.onload = function() {
 
-                // Redirect back to dashboard after a few seconds
-                setTimeout(() => {
-                    window.location.href = "{{ $redirectUrl ?? route('reports.menu') }}";
-                }, 3000);
-            }, 1000);
-        }
-    </script>
+    setTimeout(() => {
+        document.getElementById('downloadForm').submit();
+    }, 800);
+
+    setTimeout(() => {
+        window.location.href = "{{ $redirectUrl ?? route('reports.menu') }}";
+    }, 2000);
+
+};
+</script>
 </body>
 
 </html>
